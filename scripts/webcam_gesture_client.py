@@ -33,8 +33,10 @@ def main() -> int:
     parser.add_argument("--camera", type=int, default=0)
     parser.add_argument("--threshold", type=float, default=1.0,
                         help="per-pixel horizontal flow magnitude that counts as motion")
-    parser.add_argument("--min-motion-ratio", type=float, default=0.01,
+    parser.add_argument("--min-motion-ratio", type=float, default=0.03,
                         help="fraction of ROI pixels in motion required to trigger a detection")
+    parser.add_argument("--stable-frames", type=int, default=3,
+                        help="consecutive frames that must agree on direction")
     args = parser.parse_args()
 
     active_app = args.active_app or ("PowerPoint" if args.activity == "presentation" else "Spotify")
@@ -49,6 +51,10 @@ def main() -> int:
         raise SystemExit("Camera could not be opened")
 
     previous_gray = None
+    background_model = cv2.createBackgroundSubtractorMOG2(
+        history=120, varThreshold=25, detectShadows=False
+    )
+    direction_history: list[str] = []
     last_detection = 0.0
     detection_count = 0
     latest_observation_id: str | None = None
@@ -76,7 +82,8 @@ def main() -> int:
                 # actually in motion instead.
                 dx = flow[..., 0]
                 dy = flow[..., 1]
-                motion_mask = np.abs(dx) > args.threshold
+                foreground_mask = background_model.apply(gray) > 0
+                motion_mask = (np.abs(dx) > args.threshold) & foreground_mask
                 moving_ratio = float(np.mean(motion_mask))
                 now = time.time()
                 if moving_ratio > args.min_motion_ratio and now - last_detection > 1.2:
@@ -86,8 +93,18 @@ def main() -> int:
                 else:
                     horizontal = False
                 if horizontal:
+                    direction_history.append("right" if mean_dx > 0 else "left")
+                    direction_history = direction_history[-args.stable_frames:]
+                else:
+                    direction_history.clear()
+                horizontal = (
+                    len(direction_history) == args.stable_frames
+                    and len(set(direction_history)) == 1
+                )
+                if horizontal:
                     max_abs_dx = float(np.max(np.abs(dx)))
-                    direction = "right" if mean_dx > 0 else "left"
+                    direction = direction_history[-1]
+                    direction_history.clear()
                     detection_count += 1
                     print(
                         f"DETECTED: {direction} "
