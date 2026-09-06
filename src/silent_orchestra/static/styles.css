@@ -1,5 +1,5 @@
 /* SilentOrchestra · Night Signal theme · Workbench layout */
-@import url("/tokens.css");
+@import url("tokens.css");
 
 *, *::before, *::after { box-sizing: border-box; }
 html { color-scheme: dark; overflow-x: clip; }

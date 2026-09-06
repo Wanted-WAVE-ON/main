@@ -3,8 +3,8 @@
 이 앱의 고정된 디자인 시스템입니다. 페이지를 다시 그릴 때마다 먼저 읽고, 페이지별 임의 테마는 만들지 않습니다.
 시스템을 넓혀야 하면 이 파일을 고칩니다.
 
-**토큰 값의 출처는 [`tokens.css`](tokens.css)** 입니다(색·타입·간격·모션·radius·shadow·z-index 전체).
-DTCG 형식은 [`design/design-tokens.json`](design/design-tokens.json). 이 문서는 값이 아니라
+**토큰 값의 출처는 [`static/tokens.css`](../src/silent_orchestra/static/tokens.css)** 입니다(색·타입·간격·모션·radius·shadow·z-index 전체).
+DTCG 형식은 [`design/design-tokens.json`](../design/design-tokens.json). 이 문서는 값이 아니라
 **값만 봐서는 알 수 없는 규칙**을 담습니다.
 
 ## Genre

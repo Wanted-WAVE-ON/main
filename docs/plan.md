@@ -1,6 +1,6 @@
 # SilentOrchestra 2.0 작업 계획
 
-명세는 [SPEC.md](SPEC.md). 이 문서는 **지금 상태와 남은 일**만 다룹니다.
+명세는 [SPEC.md](../SPEC.md). 이 문서는 **지금 상태와 남은 일**만 다룹니다.
 FR-01~FR-17 구현 현황의 원본은 Notion [WAVE:ON](https://ken-jeong.notion.site/wave-on)의 `기능 명세` 표입니다.
 
 ## 1. 현재 상태
@@ -24,7 +24,7 @@ FR-01~FR-17 구현 현황의 원본은 Notion [WAVE:ON](https://ken-jeong.notion
 
 | # | 작업 | 근거 |
 |---|---|---|
-| 1 | `POST /demo/reset` 후 [docs/demo-script.md](docs/demo-script.md) 순서로 3분 리허설 1회 | 수용 기준의 시간 항목만 자동 검증 불가 |
+| 1 | `POST /demo/reset` 후 [docs/demo-script.md](demo-script.md) 순서로 3분 리허설 1회 | 수용 기준의 시간 항목만 자동 검증 불가 |
 | 2 | Notion `기획서`·`기능 정의서`의 테스트 수치를 `5 passed` → `20 passed`로 갱신 | 저장소 문서는 동기화 완료. 심사 중 수치 불일치는 신뢰도 손실 |
 
 ### P1 — 선택 경로를 실제로 시연할 경우에만
@@ -63,10 +63,10 @@ FR-01~FR-17 구현 현황의 원본은 Notion [WAVE:ON](https://ken-jeong.notion
 
 | 위치 | 단순화 | 승급 조건 |
 |---|---|---|
-| [static/app.js:420](src/silent_orchestra/static/app.js:420) | SSE 대신 3초 폴링 | 사용자·탭이 늘어날 때 |
-| [action_executor.py:22](src/silent_orchestra/services/action_executor.py:22) | 활성 창 이름 부분 문자열 매칭 | 앱 이름이 겹쳐 오탐이 날 때 |
-| [action_executor.py:57](src/silent_orchestra/services/action_executor.py:57) | 리눅스 활성 창 미지원 | 리눅스에서 OS 실행이 필요할 때 |
-| [models.py:23](src/silent_orchestra/models.py:23) | `Annotated` 컬럼 별칭 | 없음(유지) |
+| [static/app.js:420](../src/silent_orchestra/static/app.js:420) | SSE 대신 3초 폴링 | 사용자·탭이 늘어날 때 |
+| [action_executor.py:22](../src/silent_orchestra/services/action_executor.py:22) | 활성 창 이름 부분 문자열 매칭 | 앱 이름이 겹쳐 오탐이 날 때 |
+| [action_executor.py:57](../src/silent_orchestra/services/action_executor.py:57) | 리눅스 활성 창 미지원 | 리눅스에서 OS 실행이 필요할 때 |
+| [models.py:23](../src/silent_orchestra/models.py:23) | `Annotated` 컬럼 별칭 | 없음(유지) |
 
 ## 5. 검증
 

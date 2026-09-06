@@ -1,4 +1,4 @@
-# SilentOrchestra 2.0 명세
+# SilentOrchestra 2.0 — SPEC
 
 이 문서는 구현이 지켜야 하는 **규범적 규칙**만 담습니다. 충돌 시 이 문서가 우선합니다.
 배경은 [docs/brief.md](docs/brief.md), 구조는 [docs/architecture.md](docs/architecture.md),
@@ -18,7 +18,7 @@ Observation → Pattern → Suggestion → Memory → Execution → Feedback
 
 기억의 기본 키는 `user + gesture_key + context_scope = intent`입니다. 제스처 자체는 명령이 아닙니다.
 
-### 용어
+### 1.1. 용어
 
 | 용어 | 정의 |
 |---|---|
@@ -54,7 +54,7 @@ CHECK 제약을 함께 고쳐야 합니다.
 
 ## 3. 도메인 규칙
 
-### 3.1 개인정보 (타협 불가)
+### 3.1. 개인정보 (타협 불가)
 
 | ID | 규칙 |
 |---|---|
@@ -63,7 +63,7 @@ CHECK 제약을 함께 고쳐야 합니다.
 | P-3 | 얼굴·신원 특징을 저장하지 않는다. 저장 대상은 motion_type, direction, duration_ms, embedding, context, 후속 행동뿐이다. |
 | P-4 | 웹캠 클라이언트는 프레임을 메모리에서만 사용하고 디스크에 쓰지 않는다. |
 
-### 3.2 학습
+### 3.2. 학습
 
 | ID | 규칙 |
 |---|---|
@@ -75,7 +75,7 @@ CHECK 제약을 함께 고쳐야 합니다.
 | L-6 | 승자 횟수가 `suggestion_threshold`(기본 3) 이상이고 동률이 아니며 패턴이 `ACTIVE`가 아닐 때만 `PENDING` 제안을 만든다. 같은 패턴에 대기 중 제안이 이미 있으면 새로 만들지 않는다. |
 | L-7 | `(user_id, gesture_key, context_scope, intent)`는 유일하다. |
 
-### 3.3 승인과 기억
+### 3.3. 승인과 기억
 
 | ID | 규칙 |
 |---|---|
@@ -86,7 +86,7 @@ CHECK 제약을 함께 고쳐야 합니다.
 | M-5 | 거절 시 패턴은 `REJECTED`, `auto_execute=false`, confidence −0.20. 이후 같은 조합이 다시 관찰되면 `CANDIDATE`로 복귀한다. |
 | M-6 | `GET /memories`는 `ACTIVE`이고 confidence ≥ `auto_execution_threshold`인 기억만 반환한다. |
 
-### 3.4 추론과 실행
+### 3.4. 추론과 실행
 
 | ID | 규칙 |
 |---|---|
@@ -98,7 +98,7 @@ CHECK 제약을 함께 고쳐야 합니다.
 | I-6 | OS 실행 시 `SO_REQUIRE_ACTIVE_WINDOW=true`(기본)면 대상 앱이 활성 창인지 먼저 확인한다. 대상이 아니거나 확인할 수 없으면 **키를 보내지 않고** `FAILED`로 기록하며 사유를 UI에 표시한다. |
 | I-7 | 매핑되지 않은 intent는 키를 보내지 않고 `FAILED`로 기록한다. |
 
-### 3.5 피드백
+### 3.5. 피드백
 
 | ID | 규칙 |
 |---|---|
@@ -107,7 +107,7 @@ CHECK 제약을 함께 고쳐야 합니다.
 | F-3 | `WRONG_ACTION` + `corrected_intent`는 기억의 intent를 교정한다. 교정 intent도 M-3과 동일한 검증을 받는다. |
 | F-4 | confidence가 `auto_execution_threshold` 미만으로 떨어지면 `auto_execute=false`, `status='CANDIDATE'`로 강등한다. |
 
-### 3.6 데모 운영
+### 3.6. 데모 운영
 
 | ID | 규칙 |
 |---|---|
@@ -115,7 +115,7 @@ CHECK 제약을 함께 고쳐야 합니다.
 | D-2 | 종속 데이터는 `ON DELETE CASCADE`로 함께 삭제된다. 초기화 후 종속 행은 0건이며 재학습이 가능해야 한다. |
 | D-3 | `SO_DEMO_MODE=false`면 초기화는 `403`이며 데이터를 변경하지 않는다. |
 
-### 3.7 UI 표시 (FR-15)
+### 3.7. UI 표시 (FR-15)
 
 | ID | 규칙 |
 |---|---|

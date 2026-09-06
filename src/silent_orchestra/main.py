@@ -13,7 +13,6 @@ from .routers import agent, demo, health, users
 from .services.demo_service import ensure_demo_user
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-TOKENS_FILE = PROJECT_ROOT / "tokens.css"
 
 
 @asynccontextmanager
@@ -48,11 +47,6 @@ app.include_router(users.router, prefix=settings.api_prefix)
 app.include_router(agent.router, prefix=settings.api_prefix)
 app.include_router(demo.router, prefix=settings.api_prefix)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-
-@app.get("/tokens.css", include_in_schema=False)
-def design_tokens() -> FileResponse:
-    return FileResponse(TOKENS_FILE, media_type="text/css")
 
 
 @app.get("/", include_in_schema=False)

@@ -12,18 +12,18 @@ Observation → Pattern → Suggestion → Memory → Execution → Feedback
 자동 실행됩니다.
 
 - 규범적 규칙(구현이 지켜야 하는 계약): [SPEC.md](SPEC.md) — 충돌 시 우선
-- 현재 상태와 남은 일: [PLAN.md](PLAN.md)
+- 현재 상태와 남은 일: [docs/plan.md](docs/plan.md)
 - API 계약: 서버 실행 후 `http://127.0.0.1:8000/docs` (OpenAPI)
 
 ## 빠른 실행
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+python -m pip install -e .
 python run_demo.py
 ```
 
-`start_demo.sh` / `start_demo.bat`도 같은 일을 합니다. 브라우저에서 `http://127.0.0.1:8000`을 엽니다.
+브라우저에서 `http://127.0.0.1:8000`을 엽니다.
 
 ## 90초 데모
 
@@ -43,7 +43,7 @@ python run_demo.py
 OpenCV Optical Flow 기반. 원본 프레임은 저장하지 않습니다.
 
 ```bash
-python -m pip install -r requirements-camera.txt
+python -m pip install -e ".[camera]"
 python scripts/webcam_gesture_client.py --activity presentation
 ```
 
@@ -69,7 +69,7 @@ SO_ENABLE_OS_ACTIONS=true
 ## 검증
 
 ```bash
-python -m pip install -r requirements-dev.txt && python -m pytest -q
+python -m pip install -e ".[dev]" && python -m pytest -q
 ```
 
 ```bash
@@ -81,9 +81,9 @@ python scripts/validate_sqlite.py --schema sql/schema.sql --seed sql/seed.sql --
 ## 구조
 
 ```text
-SPEC.md          규범적 규칙          PLAN.md    현재 상태와 남은 일
-docs/            기획·아키텍처·ERD·데모 대본·Q&A·결정 로그
-design.md        디자인 시스템 (구현: tokens.css, design/design-tokens.json)
+SPEC.md          규범적 규칙(충돌 시 우선)
+docs/            기획·아키텍처·ERD·데모 대본·Q&A·결정 로그·현재 상태(plan.md)·디자인 시스템(design.md)
+design/          design-tokens.json (구현 토큰: src/silent_orchestra/static/tokens.css)
 sql/             schema, seed, queries, tests, 검증 보고서
 src/silent_orchestra/  FastAPI 백엔드(routers/ + services/)와 웹 UI(static/)
 scripts/         SQLite 검증, 웹캠 모션 클라이언트
