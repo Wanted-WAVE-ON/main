@@ -18,6 +18,10 @@ if not cap.isOpened():
 
 print('CAMERA_OK. Move hand horizontally inside guide.')
 prev_gray = None
+background_model = cv2.createBackgroundSubtractorMOG2(
+    history=120, varThreshold=25, detectShadows=False
+)
+direction_history = []
 last_detection = 0.0
 latest_obs_id = None
 detection_count = 0
@@ -47,18 +51,25 @@ try:
             flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 21, 3, 5, 1.2, 0)
             dx = flow[..., 0]
             max_abs_dx = float(np.max(np.abs(dx)))
-            motion_mask = np.abs(dx) > 1.0
+            foreground_mask = background_model.apply(gray) > 0
+            motion_mask = (np.abs(dx) > 1.0) & foreground_mask
             moving_ratio = float(np.mean(motion_mask))
             now = time.time()
-            if moving_ratio > 0.01 and now - last_detection > 1.2:
+            if moving_ratio > 0.03 and now - last_detection > 1.2:
                 mean_dx_on_motion = float(np.mean(dx[motion_mask])) if motion_mask.any() else 0.0
-                if abs(mean_dx_on_motion) > 0.3:
-                    direction = 'right' if mean_dx_on_motion > 0 else 'left'
+                mean_dy_on_motion = float(np.mean(flow[..., 1][motion_mask])) if motion_mask.any() else 0.0
+                if abs(mean_dx_on_motion) > 0.3 and abs(mean_dx_on_motion) > abs(mean_dy_on_motion):
+                    direction_history.append('right' if mean_dx_on_motion > 0 else 'left')
+                    direction_history = direction_history[-3:]
+                else:
+                    direction_history.clear()
+                if len(direction_history) == 3 and len(set(direction_history)) == 1:
+                    direction = direction_history[-1]
+                    direction_history.clear()
                     detected = True
                     last_detection = now
                     detection_count += 1
                     print(f'DETECTED: {direction} (max|dx|={max_abs_dx:.2f}, moving_ratio={moving_ratio:.1%}) #{detection_count}')
-
                     payload = {
                         'user_id': 'demo-user',
                         'context': {'active_app': 'PowerPoint', 'activity': 'presentation', 'space': 'camera_demo', 'device': 'laptop'},
@@ -75,6 +86,8 @@ try:
                             print(f'  => No match (try N/B to teach action)')
                     else:
                         print('  => observe POST failed')
+            else:
+                direction_history.clear()
 
         prev_gray = gray
         cv2.rectangle(frame, (x1,y1), (x2,y2), (104,224,255), 2)
