@@ -49,6 +49,19 @@ app.include_router(demo.router, prefix=settings.api_prefix)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+@app.middleware("http")
+async def revalidate_static(request, call_next):
+    """Make browsers revalidate /static instead of guessing a freshness window.
+
+    StaticFiles sends no Cache-Control, so browsers heuristically cache app.js
+    and can serve a stale UI on the demo machine. The ETag still answers 304.
+    """
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["cache-control"] = "no-cache"
+    return response
+
+
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")

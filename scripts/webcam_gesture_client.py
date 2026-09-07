@@ -11,14 +11,17 @@ def post_json(url: str, payload: dict[str, Any]) -> dict[str, Any]:
     return response.json()
 
 
+KEY_ACTIONS = {
+    ("n", "presentation"): ("NEXT_SLIDE", "powerpoint"),
+    ("n", "music"): ("NEXT_TRACK", "media_player"),
+    ("b", "presentation"): ("PREVIOUS_SLIDE", "powerpoint"),
+    ("b", "music"): ("PREVIOUS_TRACK", "media_player"),
+    (" ", "music"): ("TOGGLE_PLAYBACK", "media_player"),
+}
+
+
 def action_for_key(key: int, activity: str) -> tuple[str, str] | None:
-    if key == ord("n"):
-        return ("NEXT_SLIDE", "powerpoint") if activity == "presentation" else ("NEXT_TRACK", "media_player")
-    if key == ord("b"):
-        return ("PREVIOUS_SLIDE", "powerpoint") if activity == "presentation" else ("PREVIOUS_TRACK", "media_player")
-    if key == ord(" ") and activity == "music":
-        return ("TOGGLE_PLAYBACK", "media_player")
-    return None
+    return KEY_ACTIONS.get((chr(key), activity))
 
 
 def main() -> int:
@@ -86,22 +89,19 @@ def main() -> int:
                 motion_mask = (np.abs(dx) > args.threshold) & foreground_mask
                 moving_ratio = float(np.mean(motion_mask))
                 now = time.time()
+                mean_dx = mean_dy = 0.0
                 if moving_ratio > args.min_motion_ratio and now - last_detection > 1.2:
                     mean_dx = float(np.mean(dx[motion_mask]))
                     mean_dy = float(np.mean(dy[motion_mask]))
-                    horizontal = abs(mean_dx) > 0.3 and abs(mean_dx) > abs(mean_dy)
-                else:
-                    horizontal = False
-                if horizontal:
+                if abs(mean_dx) > 0.3 and abs(mean_dx) > abs(mean_dy):
                     direction_history.append("right" if mean_dx > 0 else "left")
                     direction_history = direction_history[-args.stable_frames:]
                 else:
                     direction_history.clear()
-                horizontal = (
+                if (
                     len(direction_history) == args.stable_frames
                     and len(set(direction_history)) == 1
-                )
-                if horizontal:
+                ):
                     max_abs_dx = float(np.max(np.abs(dx)))
                     direction = direction_history[-1]
                     direction_history.clear()

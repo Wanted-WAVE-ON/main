@@ -73,6 +73,12 @@ def test_health_and_privacy(client):
     assert privacy["cloud_video_uploaded"] is False
 
 
+def test_static_assets_are_revalidated(client):
+    # Without this the browser guesses a freshness window and can serve a stale
+    # app.js on the demo machine.
+    assert client.get("/static/app.js").headers["cache-control"] == "no-cache"
+
+
 def test_learning_loop_suggest_accept_execute(client):
     bootstrap(client)
     pattern = train_and_accept(

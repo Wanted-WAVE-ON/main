@@ -12,7 +12,7 @@ Observation → Pattern → Suggestion → Memory → Execution → Feedback
 자동 실행됩니다.
 
 - 규범적 규칙(구현이 지켜야 하는 계약): [SPEC.md](SPEC.md) — 충돌 시 우선
-- 현재 상태와 남은 일: [docs/plan.md](docs/plan.md)
+- 현재 상태와 남은 일: [TASKS.md](TASKS.md)
 - API 계약: 서버 실행 후 `http://127.0.0.1:8000/docs` (OpenAPI)
 
 ## 빠른 실행
@@ -64,7 +64,7 @@ SO_ENABLE_OS_ACTIONS=true
 대상 앱 이름은 `services/action_executor.py`의 `TARGET_WINDOWS`에서 조정합니다. 검증을 끄는
 `SO_REQUIRE_ACTIVE_WINDOW=false`는 활성 창 확인 수단이 없는 환경(X11/Wayland)에서만 쓰는 최후 수단입니다.
 
-전체 환경 변수는 [SPEC.md](SPEC.md#6-설정)에 있습니다.
+전체 환경 변수는 [config.py](src/silent_orchestra/config.py)에 있습니다.
 
 ## 검증
 
@@ -76,13 +76,15 @@ python -m pip install -e ".[dev]" && python -m pytest -q
 python scripts/validate_sqlite.py --schema sql/schema.sql --seed sql/seed.sql --queries sql/queries.sql --tests sql/tests.sql --report sql/validation-report.json
 ```
 
-현재: pytest 20 passed, SQLite 38 statements passed. 수용 기준은 [SPEC.md](SPEC.md#7-수용-기준) 참고.
+현재: pytest 21 passed, SQLite 38 statements passed. 수용 기준은 [SPEC.md](SPEC.md#완료-기준) 참고.
 
 ## 구조
 
 ```text
 SPEC.md          규범적 규칙(충돌 시 우선)
-docs/            기획·아키텍처·ERD·데모 대본·Q&A·결정 로그·현재 상태(plan.md)·디자인 시스템(design.md)
+PLAN.md          현재 상태·위험·보류 항목
+TASKS.md         남은 실행 항목
+docs/            기획·아키텍처·ERD·데모 대본·Q&A·결정 로그·디자인 시스템
 design/          design-tokens.json (구현 토큰: src/silent_orchestra/static/tokens.css)
 sql/             schema, seed, queries, tests, 검증 보고서
 src/silent_orchestra/  FastAPI 백엔드(routers/ + services/)와 웹 UI(static/)
@@ -94,4 +96,4 @@ assets/          다이어그램 소스(.dot), 브랜드 아이콘
 ## 개인정보 보호
 
 원본 영상 저장·얼굴 인식·클라우드 업로드를 하지 않습니다. 모션 특징 벡터와 맥락만 로컬에 남으며,
-DB CHECK 제약으로 강제됩니다. 규칙 전문은 [SPEC.md](SPEC.md#31-개인정보-타협-불가) P-1~P-4.
+DB CHECK 제약으로 강제됩니다. 규칙 전문은 [SPEC.md](SPEC.md#입력개인정보-fr-01-fr-03-fr-14-fr-17) P-1~P-4.

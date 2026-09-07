@@ -38,11 +38,6 @@ from ..services.pattern_learning import record_user_action, respond_to_suggestio
 router = APIRouter(tags=["agent"])
 
 
-def _ensure_user(db: Session, user_id: str) -> None:
-    if db.get(User, user_id) is None:
-        raise HTTPException(status_code=404, detail="User not found")
-
-
 def _get_or_404(db: Session, model: type, key: str, label: str):
     instance = db.get(model, key)
     if instance is None:
@@ -52,7 +47,7 @@ def _get_or_404(db: Session, model: type, key: str, label: str):
 
 @router.post("/observe", response_model=ObserveResponse)
 def observe(payload: ObserveRequest, db: Session = Depends(get_db)) -> dict:
-    _ensure_user(db, payload.user_id)
+    _get_or_404(db, User, payload.user_id, "User")
     context = Context(
         id=str(uuid4()),
         user_id=payload.user_id,
@@ -90,7 +85,7 @@ def observe(payload: ObserveRequest, db: Session = Depends(get_db)) -> dict:
 
 @router.post("/teach", response_model=TeachResponse)
 def teach(payload: TeachRequest, db: Session = Depends(get_db)) -> dict:
-    _ensure_user(db, payload.user_id)
+    _get_or_404(db, User, payload.user_id, "User")
     try:
         action, pattern, suggestion = record_user_action(db, payload)
     except ValueError as exc:
@@ -110,7 +105,7 @@ def list_suggestions(
     status: str | None = None,
     db: Session = Depends(get_db),
 ) -> list[AgentSuggestion]:
-    _ensure_user(db, user_id)
+    _get_or_404(db, User, user_id, "User")
     stmt = select(AgentSuggestion).where(AgentSuggestion.user_id == user_id)
     if status:
         stmt = stmt.where(AgentSuggestion.status == status.upper())
@@ -140,7 +135,7 @@ def list_memories(
     context_scope: str | None = None,
     db: Session = Depends(get_db),
 ) -> list[GesturePattern]:
-    _ensure_user(db, user_id)
+    _get_or_404(db, User, user_id, "User")
     stmt = select(GesturePattern).where(
         GesturePattern.user_id == user_id,
         GesturePattern.status == "ACTIVE",
@@ -171,7 +166,7 @@ def submit_feedback(
 
 @router.get("/dashboard", response_model=DashboardResponse)
 def dashboard(user_id: str, db: Session = Depends(get_db)) -> dict:
-    _ensure_user(db, user_id)
+    _get_or_404(db, User, user_id, "User")
 
     def recent(model, order_column, *conditions, limit: int | None = None) -> list:
         stmt = (

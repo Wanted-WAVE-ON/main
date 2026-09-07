@@ -1,7 +1,7 @@
 # ERD 및 데이터 설계
 
 컬럼 정의의 출처는 [sql/schema.sql](../sql/schema.sql), 제약의 규범적 근거는
-[SPEC.md](../SPEC.md#5-데이터-계약)입니다.
+[SPEC.md](../SPEC.md#맥락학습-fr-02-fr-04-fr-05-fr-07)입니다.
 
 ## 1. 관계도
 

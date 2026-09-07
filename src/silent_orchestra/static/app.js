@@ -288,9 +288,10 @@ function showActionOverlay(inference) {
   byId("overlayConfidence").textContent = failed
     ? executionError(inference.execution)
     : `Learned gesture / ${Math.round(inference.confidence * 100)}%`;
+  // ponytail: no auto-close timer - the feedback buttons live in here, and a
+  // presenter narrating the execution needs longer than any timeout we'd pick.
+  // Esc and a backdrop click already dismiss it.
   if (!overlay.open) overlay.showModal();
-  window.clearTimeout(showActionOverlay.timer);
-  showActionOverlay.timer = window.setTimeout(() => closeActionOverlay(), 5200);
 }
 
 function closeActionOverlay() {

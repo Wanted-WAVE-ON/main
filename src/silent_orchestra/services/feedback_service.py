@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -55,7 +54,6 @@ def record_feedback(
     if pattern.confidence < settings.auto_execution_threshold:
         pattern.auto_execute = False
         pattern.status = "CANDIDATE"
-    pattern.updated_at = datetime.now(timezone.utc)
 
     db.commit()
     return feedback, pattern

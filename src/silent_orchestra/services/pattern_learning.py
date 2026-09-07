@@ -117,7 +117,6 @@ def record_user_action(
         pattern.observation_count = winning_count
         if pattern.status == "REJECTED":
             pattern.status = "CANDIDATE"
-        pattern.updated_at = datetime.now(timezone.utc)
 
     db.flush()
 
@@ -189,9 +188,8 @@ def respond_to_suggestion(
             raise ValueError("modified_intent is required for MODIFIED")
         check_intent_change(db, pattern, modified_intent, "modified_intent")
 
-    now = datetime.now(timezone.utc)
     suggestion.status = decision
-    suggestion.responded_at = now
+    suggestion.responded_at = datetime.now(timezone.utc)
 
     if decision == "REJECTED":
         pattern.status = "REJECTED"
@@ -211,12 +209,11 @@ def respond_to_suggestion(
                 GesturePattern.id != pattern.id,
                 GesturePattern.status == "ACTIVE",
             )
-            .values(status="CANDIDATE", auto_execute=False, updated_at=now)
+            .values(status="CANDIDATE", auto_execute=False)
         )
         pattern.status = "ACTIVE"
         pattern.auto_execute = True
         pattern.confidence = max(pattern.confidence, settings.auto_execution_threshold)
 
-    pattern.updated_at = now
     db.commit()
     return suggestion, pattern
