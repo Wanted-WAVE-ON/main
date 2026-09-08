@@ -430,6 +430,42 @@ def test_reset_clears_learned_data_and_relearning_works(client):
     assert observe(client)["inference"]["matched"] is True
 
 
+def test_reset_failure_rolls_back_with_no_partial_deletion(client, monkeypatch):
+    """FR-16 AC-FR-16-02: a failure mid-reset leaves the prior state fully intact."""
+    import pytest
+    from sqlalchemy.orm import Session
+
+    bootstrap(client)
+    train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
+    before = client.get("/api/v1/dashboard?user_id=demo-user").json()
+    assert before["counts"]["learned_memories"] == 1
+    assert before["counts"]["observations"] > 0
+
+    # Fail after the demo user (and its cascaded rows) have been deleted and
+    # flushed, but before the replacement user is persisted.
+    def failing_add(self, *args, **kwargs):
+        raise RuntimeError("simulated failure after cascade delete")
+
+    monkeypatch.setattr(Session, "add", failing_add)
+    with pytest.raises(RuntimeError):
+        client.post("/api/v1/demo/reset")
+    monkeypatch.undo()
+
+    after = client.get("/api/v1/dashboard?user_id=demo-user").json()
+    assert "counts" in after, "demo user was partially deleted despite the failure"
+    assert after["counts"] == before["counts"]
+    assert after["events"] == before["events"]
+
+    # The session is not wedged: a real reset still succeeds afterwards.
+    assert client.post("/api/v1/demo/reset").status_code == 200
+    assert client.get("/api/v1/dashboard?user_id=demo-user").json()["counts"] == {
+        "observations": 0,
+        "learned_memories": 0,
+        "pending_suggestions": 0,
+        "feedback": 0,
+    }
+
+
 def test_reset_is_refused_outside_demo_mode(client, monkeypatch):
     """FR-16: reset is a demo-only affordance."""
     from silent_orchestra.config import settings
