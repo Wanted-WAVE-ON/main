@@ -1,11 +1,44 @@
-.venv/
+# OS
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Logs
+*.log
+logs/
+
+# Python
 __pycache__/
 *.py[cod]
+.eggs/
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Tests and tooling
 .pytest_cache/
-.coverage
-htmlcov/
-.env
+
+# Local databases
 *.db
 *.sqlite
 *.sqlite3
-.DS_Store

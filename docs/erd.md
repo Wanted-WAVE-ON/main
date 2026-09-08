@@ -1,7 +1,7 @@
 # ERD 및 데이터 설계
 
-컬럼 정의의 출처는 [sql/schema.sql](../sql/schema.sql), 제약의 규범적 근거는
-[SPEC.md](../SPEC.md#맥락학습-fr-02-fr-04-fr-05-fr-07)입니다.
+컬럼 정의의 출처는 [backend/sql/schema.sql](../backend/sql/schema.sql), 제약의 규범적 근거는
+[spec.md](../spec.md#맥락학습-fr-02-fr-04-fr-05-fr-07)입니다.
 
 ## 1. 관계도
 
@@ -15,7 +15,7 @@ erDiagram
     GESTURE_PATTERNS ||--o{ AGENT_SUGGESTIONS : generates
     GESTURE_PATTERNS ||--o{ EXECUTIONS : drives
     GESTURE_OBSERVATIONS ||--o{ EXECUTIONS : triggers
-    EXECUTIONS ||--o{ FEEDBACK : receives
+    EXECUTIONS ||--o| FEEDBACK : receives
     GESTURE_PATTERNS ||--o{ FEEDBACK : updates
 ```
 
@@ -49,14 +49,10 @@ erDiagram
 
 | 파일 | 내용 |
 |---|---|
-| `sql/schema.sql` | 8개 테이블, 8개 인덱스, 제약, Personal Gesture Memory view |
-| `sql/seed.sql` | 맥락별 동일 제스처 샘플(설명·검증용 합성 데이터) |
-| `sql/queries.sql` | Memory·Suggestion·Execution·Privacy 대표 조회 |
-| `sql/tests.sql` | 외래키, 테이블 수, 원본 프레임 0건, 맥락 분기 assertion |
-| `sql/validation-report.json` | 메모리 DB 전체 실행 결과 |
+| `backend/sql/schema.sql` | 8개 테이블, 8개 인덱스, 제약, Personal Gesture Memory view |
+| `backend/sql/seed.sql` | 맥락별 동일 제스처 샘플(설명·검증용 합성 데이터) |
+| `backend/sql/queries.sql` | Memory·Suggestion·Execution·Privacy 대표 조회 |
+| `backend/sql/tests.sql` | 외래키, 테이블 수, 원본 프레임 0건, 맥락 분기 assertion |
+| `backend/sql/validation-report.json` | 메모리 DB 전체 실행 결과 |
 
-```bash
-python scripts/validate_sqlite.py --schema sql/schema.sql --seed sql/seed.sql --queries sql/queries.sql --tests sql/tests.sql --report sql/validation-report.json
-```
-
-현재 결과: `passed`, 38 statements.
+검증 명령은 [README 테스트](../README.md#테스트), 실행 결과는 [TASKS 검증 기록](../tasks.md#검증-기록)에서 관리합니다.

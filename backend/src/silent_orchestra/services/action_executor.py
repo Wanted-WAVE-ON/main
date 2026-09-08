@@ -31,6 +31,20 @@ TARGET_WINDOWS = {
 _FRONTMOST_APP = (
     'tell application "System Events" to get name of first process whose frontmost is true'
 )
+# ponytail: the process name alone is "Google Chrome", so title-based entries
+# ("slides", "impress") never match on macOS. The title needs Accessibility
+# permission, so we ask for it separately and keep the name when it is denied.
+_FRONTMOST_TITLE = (
+    'tell application "System Events" to tell (first process whose frontmost is true) '
+    "to get name of front window"
+)
+
+
+def _osascript(script: str) -> str | None:
+    result = subprocess.run(
+        ["osascript", "-e", script], capture_output=True, text=True, timeout=2, check=True
+    )
+    return result.stdout.strip() or None
 
 
 def active_window() -> str | None:
@@ -38,15 +52,12 @@ def active_window() -> str | None:
     system = platform.system()
     try:
         if system == "Darwin":
-            # Needs Accessibility permission; osascript exits non-zero without it.
-            result = subprocess.run(
-                ["osascript", "-e", _FRONTMOST_APP],
-                capture_output=True,
-                text=True,
-                timeout=2,
-                check=True,
-            )
-            return result.stdout.strip() or None
+            name = _osascript(_FRONTMOST_APP)
+            try:
+                title = _osascript(_FRONTMOST_TITLE)
+            except Exception:  # pragma: no cover - Accessibility permission denied
+                title = None
+            return " ".join(part for part in (name, title) if part) or None
         if system == "Windows":
             user32 = ctypes.windll.user32  # type: ignore[attr-defined]
             buffer = ctypes.create_unicode_buffer(512)

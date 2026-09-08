@@ -1,14 +1,11 @@
-def bootstrap(client):
-    response = client.post("/api/v1/demo/bootstrap")
-    assert response.status_code == 200
-    return response.json()["user"]
+USER = "demo-user"
 
 
 def observe(client, activity="presentation", active_app="PowerPoint", direction="right"):
     response = client.post(
         "/api/v1/observe",
         json={
-            "user_id": "demo-user",
+            "user_id": USER,
             "context": {
                 "active_app": active_app,
                 "activity": activity,
@@ -31,7 +28,7 @@ def teach(client, observation_id, intent, target):
     response = client.post(
         "/api/v1/teach",
         json={
-            "user_id": "demo-user",
+            "user_id": USER,
             "observation_id": observation_id,
             "action_type": intent,
             "target": target,
@@ -42,9 +39,35 @@ def teach(client, observation_id, intent, target):
     return response.json()
 
 
-def train_until_suggested(client, activity, app, intent, target):
+def respond(client, suggestion_id, decision, modified_intent=None, expect=200):
+    response = client.post(
+        f"/api/v1/suggestions/{suggestion_id}/respond",
+        json={"decision": decision, "modified_intent": modified_intent},
+    )
+    assert response.status_code == expect, response.text
+    return response.json()
+
+
+def feedback(client, execution_id, feedback_type, corrected_intent=None, expect=200):
+    response = client.post(
+        f"/api/v1/executions/{execution_id}/feedback",
+        json={
+            "user_id": USER,
+            "feedback_type": feedback_type,
+            "corrected_intent": corrected_intent,
+        },
+    )
+    assert response.status_code == expect, response.text
+    return response.json()
+
+
+def dashboard(client):
+    return client.get("/api/v1/dashboard", params={"user_id": USER}).json()
+
+
+def train_until_suggested(client, activity, app, intent, target, rounds=3):
     suggestion = None
-    for _ in range(3):
+    for _ in range(rounds):
         event = observe(client, activity=activity, active_app=app)
         result = teach(client, event["observation"]["id"], intent, target)
         suggestion = result.get("suggestion")
@@ -55,18 +78,16 @@ def train_until_suggested(client, activity, app, intent, target):
 
 def train_and_accept(client, activity, app, intent, target):
     suggestion = train_until_suggested(client, activity, app, intent, target)
-    response = client.post(
-        f"/api/v1/suggestions/{suggestion['id']}/respond",
-        json={"decision": "ACCEPTED"},
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["pattern"]["status"] == "ACTIVE"
-    return response.json()["pattern"]
+    pattern = respond(client, suggestion["id"], "ACCEPTED")["pattern"]
+    assert pattern["status"] == "ACTIVE"
+    return pattern
 
 
 def test_health_and_privacy(client):
     assert client.get("/health").json()["status"] == "ok"
-    bootstrap(client)
+    # The UI labels intents with this map instead of keeping its own copy.
+    demo = client.post("/api/v1/demo/bootstrap").json()
+    assert demo["intent_labels"]["NEXT_SLIDE"] == "다음 슬라이드"
     privacy = client.get("/api/v1/demo/privacy").json()
     assert privacy["raw_video_stored"] is False
     assert privacy["face_recognition_used"] is False
@@ -80,7 +101,6 @@ def test_static_assets_are_revalidated(client):
 
 
 def test_learning_loop_suggest_accept_execute(client):
-    bootstrap(client)
     pattern = train_and_accept(
         client,
         activity="presentation",
@@ -99,7 +119,6 @@ def test_learning_loop_suggest_accept_execute(client):
 
 
 def test_same_gesture_changes_with_context(client):
-    bootstrap(client)
     train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
     train_and_accept(client, "music", "Spotify", "NEXT_TRACK", "media_player")
 
@@ -111,45 +130,31 @@ def test_same_gesture_changes_with_context(client):
     memories = client.get(
         "/api/v1/memories",
         params={
-            "user_id": "demo-user",
+            "user_id": USER,
             "gesture_key": "swipe:right",
             "context_scope": "music",
         },
     ).json()
     assert [memory["intent"] for memory in memories] == ["NEXT_TRACK"]
-    dashboard = client.get("/api/v1/dashboard", params={"user_id": "demo-user"}).json()
-    assert dashboard["context"]["activity"] == "music"
+    assert dashboard(client)["context"]["activity"] == "music"
 
 
 def test_wrong_feedback_lowers_confidence(client):
-    bootstrap(client)
     train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
     inferred = observe(client, "presentation", "PowerPoint")
     execution = inferred["inference"]["execution"]
     before = execution["confidence"]
 
-    response = client.post(
-        f"/api/v1/executions/{execution['id']}/feedback",
-        json={"user_id": "demo-user", "feedback_type": "WRONG_ACTION"},
-    )
-    assert response.status_code == 200, response.text
-    after = response.json()["pattern"]
+    after = feedback(client, execution["id"], "WRONG_ACTION")["pattern"]
     assert 0.60 <= after["confidence"] < before
     assert after["status"] == "ACTIVE"
 
-    duplicate = client.post(
-        f"/api/v1/executions/{execution['id']}/feedback",
-        json={"user_id": "demo-user", "feedback_type": "WRONG_ACTION"},
-    )
-    assert duplicate.status_code == 400
+    feedback(client, execution["id"], "WRONG_ACTION", expect=400)
 
     inferred_again = observe(client, activity="presentation", active_app="PowerPoint")
     assert inferred_again["inference"]["matched"] is True
     second_execution = inferred_again["inference"]["execution"]
-    demoted = client.post(
-        f"/api/v1/executions/{second_execution['id']}/feedback",
-        json={"user_id": "demo-user", "feedback_type": "WRONG_ACTION"},
-    ).json()["pattern"]
+    demoted = feedback(client, second_execution["id"], "WRONG_ACTION")["pattern"]
     assert demoted["confidence"] < 0.60
     assert demoted["status"] == "CANDIDATE"
     assert demoted["auto_execute"] is False
@@ -158,7 +163,6 @@ def test_wrong_feedback_lowers_confidence(client):
 
 
 def test_observation_never_accepts_or_returns_raw_frame(client):
-    bootstrap(client)
     result = observe(client)
     observation = result["observation"]
     assert observation["frame_stored"] is False
@@ -168,7 +172,7 @@ def test_observation_never_accepts_or_returns_raw_frame(client):
     rejected = client.post(
         "/api/v1/observe",
         json={
-            "user_id": "demo-user",
+            "user_id": USER,
             "context": {"active_app": "PowerPoint", "activity": "presentation"},
             "gesture": {"motion_type": "swipe", "direction": "right", "image": "raw"},
             "frame": "raw",
@@ -178,23 +182,21 @@ def test_observation_never_accepts_or_returns_raw_frame(client):
 
 
 def test_unsupported_context_is_rejected_without_creating_data(client):
-    bootstrap(client)
     response = client.post(
         "/api/v1/observe",
         json={
-            "user_id": "demo-user",
+            "user_id": USER,
             "context": {"active_app": "Browser", "activity": "browser"},
             "gesture": {"motion_type": "swipe", "direction": "right"},
         },
     )
     assert response.status_code == 422
-    dashboard = client.get("/api/v1/dashboard", params={"user_id": "demo-user"}).json()
-    assert dashboard["context"] is None
-    assert dashboard["counts"]["observations"] == 0
+    state = dashboard(client)
+    assert state["context"] is None
+    assert state["counts"]["observations"] == 0
 
 
 def test_tied_intents_withdraw_pending_suggestion(client):
-    bootstrap(client)
     train_until_suggested(
         client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint"
     )
@@ -204,13 +206,12 @@ def test_tied_intents_withdraw_pending_suggestion(client):
 
     assert result["suggestion"] is None
     pending = client.get(
-        "/api/v1/suggestions", params={"user_id": "demo-user", "status": "PENDING"}
+        "/api/v1/suggestions", params={"user_id": USER, "status": "PENDING"}
     ).json()
     assert pending == []
 
 
 def test_tied_intents_suspend_active_memory(client):
-    bootstrap(client)
     train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
     for _ in range(3):
         event = observe(client)
@@ -227,55 +228,37 @@ def test_tied_intents_suspend_active_memory(client):
 
 
 def test_suggestion_can_be_modified(client):
-    bootstrap(client)
     suggestion = train_until_suggested(
         client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint"
     )
 
-    response = client.post(
-        f"/api/v1/suggestions/{suggestion['id']}/respond",
-        json={"decision": "MODIFIED", "modified_intent": "PREVIOUS_SLIDE"},
-    )
-    assert response.status_code == 200, response.text
-    pattern = response.json()["pattern"]
+    pattern = respond(client, suggestion["id"], "MODIFIED", "PREVIOUS_SLIDE")["pattern"]
     assert pattern["intent"] == "PREVIOUS_SLIDE"
     assert pattern["status"] == "ACTIVE"
 
 
 def test_accepting_relearned_intent_deactivates_modified_memory(client):
-    bootstrap(client)
     suggestion = train_until_suggested(
         client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint"
     )
-    response = client.post(
-        f"/api/v1/suggestions/{suggestion['id']}/respond",
-        json={"decision": "MODIFIED", "modified_intent": "PREVIOUS_SLIDE"},
-    )
-    assert response.status_code == 200, response.text
+    respond(client, suggestion["id"], "MODIFIED", "PREVIOUS_SLIDE")
 
     event = observe(client)
     relearned = teach(
         client, event["observation"]["id"], "NEXT_SLIDE", "powerpoint"
     )["suggestion"]
-    response = client.post(
-        f"/api/v1/suggestions/{relearned['id']}/respond",
-        json={"decision": "ACCEPTED"},
-    )
-    assert response.status_code == 200, response.text
+    respond(client, relearned["id"], "ACCEPTED")
 
-    memories = client.get(
-        "/api/v1/memories", params={"user_id": "demo-user"}
-    ).json()
+    memories = client.get("/api/v1/memories", params={"user_id": USER}).json()
     assert [memory["intent"] for memory in memories] == ["NEXT_SLIDE"]
 
 
 def test_suggestion_rejects_intent_from_another_context(client):
-    bootstrap(client)
     observation_id = observe(client)["observation"]["id"]
     invalid_teach = client.post(
         "/api/v1/teach",
         json={
-            "user_id": "demo-user",
+            "user_id": USER,
             "observation_id": observation_id,
             "action_type": "NEXT_TRACK",
             "target": "media_player",
@@ -288,78 +271,41 @@ def test_suggestion_rejects_intent_from_another_context(client):
         client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint"
     )
 
-    response = client.post(
-        f"/api/v1/suggestions/{suggestion['id']}/respond",
-        json={"decision": "MODIFIED", "modified_intent": "NEXT_TRACK"},
-    )
-    assert response.status_code == 400
-    assert "not allowed" in response.json()["detail"]
+    rejected = respond(client, suggestion["id"], "MODIFIED", "NEXT_TRACK", expect=400)
+    assert "not allowed" in rejected["detail"]
 
 
 def test_suggestion_rejects_duplicate_modified_intent(client):
-    bootstrap(client)
     train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
-    suggestion = None
-    for _ in range(4):
-        event = observe(client)
-        suggestion = teach(
-            client, event["observation"]["id"], "PREVIOUS_SLIDE", "powerpoint"
-        )["suggestion"]
-
-    response = client.post(
-        f"/api/v1/suggestions/{suggestion['id']}/respond",
-        json={"decision": "MODIFIED", "modified_intent": "NEXT_SLIDE"},
+    suggestion = train_until_suggested(
+        client, "presentation", "PowerPoint", "PREVIOUS_SLIDE", "powerpoint", rounds=4
     )
-    assert response.status_code == 400
-    assert "already exists" in response.json()["detail"]
+
+    rejected = respond(client, suggestion["id"], "MODIFIED", "NEXT_SLIDE", expect=400)
+    assert "already exists" in rejected["detail"]
 
 
 def test_feedback_rejects_intent_from_another_context(client):
-    bootstrap(client)
     train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
     execution = observe(client)["inference"]["execution"]
 
-    response = client.post(
-        f"/api/v1/executions/{execution['id']}/feedback",
-        json={
-            "user_id": "demo-user",
-            "feedback_type": "WRONG_ACTION",
-            "corrected_intent": "NEXT_TRACK",
-        },
-    )
-    assert response.status_code == 400
-    assert "not allowed" in response.json()["detail"]
+    rejected = feedback(client, execution["id"], "WRONG_ACTION", "NEXT_TRACK", expect=400)
+    assert "not allowed" in rejected["detail"]
 
     inferred = observe(client)
     assert inferred["inference"]["intent"] == "NEXT_SLIDE"
 
 
 def test_feedback_rejects_duplicate_corrected_intent(client):
-    bootstrap(client)
     train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
-    suggestion = None
-    for _ in range(4):
-        event = observe(client)
-        suggestion = teach(
-            client, event["observation"]["id"], "PREVIOUS_SLIDE", "powerpoint"
-        )["suggestion"]
-    response = client.post(
-        f"/api/v1/suggestions/{suggestion['id']}/respond",
-        json={"decision": "ACCEPTED"},
+    suggestion = train_until_suggested(
+        client, "presentation", "PowerPoint", "PREVIOUS_SLIDE", "powerpoint", rounds=4
     )
-    assert response.status_code == 200, response.text
+    respond(client, suggestion["id"], "ACCEPTED")
     execution = observe(client)["inference"]["execution"]
 
-    response = client.post(
-        f"/api/v1/executions/{execution['id']}/feedback",
-        json={
-            "user_id": "demo-user",
-            "feedback_type": "WRONG_ACTION",
-            "corrected_intent": "NEXT_SLIDE",
-        },
-    )
-    assert response.status_code == 400
-    assert "already exists" in response.json()["detail"]
+    rejected = feedback(client, execution["id"], "WRONG_ACTION", "NEXT_SLIDE", expect=400)
+    assert "already exists" in rejected["detail"]
 
 
 def test_os_execution_is_blocked_when_target_app_is_not_active(monkeypatch):
@@ -392,11 +338,35 @@ def test_os_execution_is_blocked_when_target_app_is_not_active(monkeypatch):
     assert action_executor.execute_action("NEXT_SLIDE", "powerpoint")[0] == "OS"
 
 
+def test_macos_active_window_merges_the_window_title(monkeypatch):
+    """FR-10: on macOS only the title says "Google Slides"; without permission the name remains."""
+    import platform
+
+    from silent_orchestra.services import action_executor
+
+    monkeypatch.setattr(platform, "system", lambda: "Darwin")
+
+    def osascript(script):
+        if "front window" in script:
+            return "Demo - Google Slides - Google Chrome"
+        return "Google Chrome"
+
+    monkeypatch.setattr(action_executor, "_osascript", osascript)
+    assert action_executor.check_active_window("powerpoint") is None
+
+    def denied(script):
+        if "front window" in script:
+            raise RuntimeError("-1719 accessibility permission denied")
+        return "Google Chrome"
+
+    monkeypatch.setattr(action_executor, "_osascript", denied)
+    assert action_executor.active_window() == "Google Chrome"
+
+
 def test_failed_execution_is_visible_as_failed_in_the_dashboard(client, monkeypatch):
     """FR-15: the dashboard separates a failed execution from a successful one."""
     from silent_orchestra.services import intent_reasoner
 
-    bootstrap(client)
     train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
     monkeypatch.setattr(
         intent_reasoner, "execute_action", lambda *_: ("OS", "FAILED", "대상 앱이 활성 상태가 아닙니다.")
@@ -404,7 +374,7 @@ def test_failed_execution_is_visible_as_failed_in_the_dashboard(client, monkeypa
     result = observe(client)
     assert result["inference"]["execution"]["status"] == "FAILED"
 
-    events = client.get("/api/v1/dashboard?user_id=demo-user").json()["events"]
+    events = dashboard(client)["events"]
     execution_event = next(event for event in events if event["type"] == "execution")
     assert execution_event["status"] == "FAILED"
     assert "활성 상태가 아닙니다" in execution_event["detail"]
@@ -412,19 +382,18 @@ def test_failed_execution_is_visible_as_failed_in_the_dashboard(client, monkeypa
 
 def test_reset_clears_learned_data_and_relearning_works(client):
     """FR-16: reset erases dependent rows, and the loop can be trained again after it."""
-    bootstrap(client)
     train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
     assert observe(client)["inference"]["matched"] is True
 
     assert client.post("/api/v1/demo/reset").status_code == 200
-    dashboard = client.get("/api/v1/dashboard?user_id=demo-user").json()
-    assert dashboard["counts"] == {
+    state = dashboard(client)
+    assert state["counts"] == {
         "observations": 0,
         "learned_memories": 0,
         "pending_suggestions": 0,
         "feedback": 0,
     }
-    assert dashboard["events"] == []
+    assert state["events"] == []
 
     train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
     assert observe(client)["inference"]["matched"] is True
@@ -435,7 +404,6 @@ def test_reset_failure_rolls_back_with_no_partial_deletion(client, monkeypatch):
     import pytest
     from sqlalchemy.orm import Session
 
-    bootstrap(client)
     train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
     before = client.get("/api/v1/dashboard?user_id=demo-user").json()
     assert before["counts"]["learned_memories"] == 1
@@ -470,9 +438,8 @@ def test_reset_is_refused_outside_demo_mode(client, monkeypatch):
     """FR-16: reset is a demo-only affordance."""
     from silent_orchestra.config import settings
 
-    bootstrap(client)
     train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
     monkeypatch.setattr(settings, "demo_mode", False)
 
     assert client.post("/api/v1/demo/reset").status_code == 403
-    assert client.get("/api/v1/dashboard?user_id=demo-user").json()["counts"]["learned_memories"] == 1
+    assert dashboard(client)["counts"]["learned_memories"] == 1

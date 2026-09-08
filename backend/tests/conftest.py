@@ -41,5 +41,7 @@ def client(testing_session):
 
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as test_client:
+        # The lifespan seeds the real database, not this per-test one.
+        assert test_client.post("/api/v1/demo/bootstrap").status_code == 200
         yield test_client
     app.dependency_overrides.clear()

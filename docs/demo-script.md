@@ -2,8 +2,7 @@
 
 ## 준비
 
-`python run_demo.py` → `http://127.0.0.1:8000` → `Reset demo` → Context가 `Presentation`인지 확인 →
-실제 OS 키 입력은 끈 상태 유지.
+[README 시작하기](../README.md#시작하기)에 따라 로컬 데모를 연 뒤 `Reset demo`를 누르고 Context가 `Presentation`인지 확인한다. 실제 OS 키 입력은 끈 상태로 유지한다.
 
 ## 타임라인
 

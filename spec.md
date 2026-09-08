@@ -1,7 +1,5 @@
 # SPEC — SilentOrchestra 2.0
 
-[PLAN.md](PLAN.md) · [TASKS.md](TASKS.md)
-
 ## 개요
 
 반복 행동과 맥락에서 개인의 몸짓 언어를 학습하는 로컬 우선 Spatial AI Agent. 흐름은 `Observation → Pattern → Suggestion → Memory → Execution → Feedback`이며, 기억의 키는 `user + gesture_key + context_scope = intent`다. 제스처 자체는 명령이 아니다.
@@ -13,7 +11,7 @@
 - 포함: `presentation`·`music`, UI 제스처 `swipe:right`·`swipe:left`·`open_palm`·`circle`, 반복 학습·제안·승인·실행·피드백. 인코더는 `pinch`·`hold`도 지원한다.
 - FR-01~FR-15는 필수, FR-16(데모 초기화)·FR-17(OpenCV Optical Flow 웹캠 입력)은 선택이다.
 - 제외: 공간 자동 인식, IoT 실기기, 얼굴·생체 인식, 클라우드 영상, LLM 자유 형식 Intent, 인증·결제·다중 사용자 동기화, 완전한 수어 인식.
-- 학습·실행 Intent는 맥락별 [CONTEXT_INTENTS](src/silent_orchestra/services/action_catalog.py)로 제한한다. 맥락 추가 시 카탈로그와 `contexts.activity`·`gesture_patterns.context_scope` CHECK 제약을 함께 변경한다.
+- 학습·실행 Intent는 맥락별 [CONTEXT_INTENTS](backend/src/silent_orchestra/services/action_catalog.py)로 제한한다. 맥락 추가 시 카탈로그와 `contexts.activity`·`gesture_patterns.context_scope` CHECK 제약을 함께 변경한다.
 
 ## 요구사항
 
@@ -40,7 +38,7 @@
 | L-6 | 승자 횟수 ≥ `suggestion_threshold`(기본 3), 동률 아님, 패턴이 `ACTIVE` 아님일 때만 `PENDING` 제안을 만든다. 패턴당 대기 제안은 최대 1개다. |
 | L-7 | `(user_id, gesture_key, context_scope, intent)`는 유일하다. |
 
-관찰마다 Context 스냅샷 1행을 생성한다. 테이블·컬럼·제약 원본은 [ERD](docs/erd.md)와 [schema.sql](sql/schema.sql), 요청·응답 스키마는 실행 서버의 `/docs`다.
+관찰마다 Context 스냅샷 1행을 생성한다. 테이블·컬럼·제약 원본은 [ERD](docs/erd.md)와 [schema.sql](backend/sql/schema.sql), 요청·응답 스키마는 실행 서버의 `/docs`다.
 
 ### 승인·기억 (FR-08, FR-09)
 

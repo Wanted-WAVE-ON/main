@@ -1,99 +1,81 @@
 # SilentOrchestra 2.0
 
-사용자가 정해진 제스처를 외우는 대신, AI가 반복되는 몸짓과 현재 맥락을 관찰해 개인의 몸짓 언어를 학습하는
-로컬 우선 Spatial AI Agent 데모입니다.
+반복되는 몸짓과 현재 맥락을 관찰해 개인의 몸짓 언어를 학습하는 로컬 우선 Spatial AI Agent 데모입니다.
 
-```text
-Observation → Pattern → Suggestion → Memory → Execution → Feedback
-```
+## 기술 스택
 
-같은 몸짓도 맥락에 따라 다르게 학습됩니다. `presentation + swipe:right → NEXT_SLIDE`,
-`music + swipe:right → NEXT_TRACK`. 제스처 자체는 명령이 아니며, 3회 반복 → 제안 → **사용자 승인 이후에만**
-자동 실행됩니다.
+Python · FastAPI · SQLAlchemy · SQLite · HTML / CSS / JavaScript
 
-- 규범적 규칙(구현이 지켜야 하는 계약): [SPEC.md](SPEC.md) — 충돌 시 우선
-- 현재 상태와 남은 일: [TASKS.md](TASKS.md)
-- API 계약: 서버 실행 후 `http://127.0.0.1:8000/docs` (OpenAPI)
+선택 기능으로 OpenCV 웹캠 입력과 PyAutoGUI OS 제어를 사용합니다. 의존성은 [pyproject.toml](backend/pyproject.toml)에서 관리합니다.
 
-## 빠른 실행
+## 시작하기
+
+### 사전 요구사항
+
+- Python 3.11 이상
+- 웹 브라우저
+
+### 설치 및 실행
+
+저장소 루트에서 실행합니다.
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
-python -m pip install -e .
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ./backend
 python run_demo.py
 ```
 
-브라우저에서 `http://127.0.0.1:8000`을 엽니다.
+Windows에서는 가상환경 활성화에 `.venv\Scripts\Activate.ps1`을 사용합니다.
+브라우저에서 [로컬 데모](http://127.0.0.1:8000)를 엽니다.
 
-## 90초 데모
+## 사용 방법
 
-1. `Presentation` 맥락에서 `오른쪽 손짓` → 후속 행동 `다음 슬라이드` 선택
-2. 같은 과정 총 3회 반복
-3. 제안 카드에서 `기억하기`
-4. 다시 `오른쪽 손짓` → `다음 슬라이드` 자동 실행
-5. `Music`으로 전환해 `다음 트랙`으로 반복 → 맥락 분기 시연
+### 데모
 
-기본값은 `DRY_RUN`이라 실제 키 입력 대신 실행 결과만 표시합니다. 3분 발표 대본은
-[docs/demo-script.md](docs/demo-script.md)에 있습니다.
+화면의 `Presentation` 맥락과 버튼 입력으로 시작합니다. 기본 `DRY_RUN` 모드에서는 실제 키 입력 없이 실행 결과를 표시합니다.
+시연 순서와 실패 시 대체 흐름은 [데모 대본](docs/demo-script.md)을 따릅니다.
 
-## 선택 기능
+API를 직접 호출하려면 실행 중인 서버의 [Swagger UI](http://127.0.0.1:8000/docs)를 사용합니다.
 
-### 웹캠 모션 감지 (FR-17)
+### 웹캠 입력
 
-OpenCV Optical Flow 기반. 원본 프레임은 저장하지 않습니다.
+서버를 실행한 상태에서 별도 터미널의 가상환경을 활성화하고 실행합니다.
 
 ```bash
-python -m pip install -e ".[camera]"
-python scripts/webcam_gesture_client.py --activity presentation
+python -m pip install -e "./backend[camera]"
+python backend/scripts/webcam_gesture_client.py --activity presentation
 ```
 
-키보드 보조: `N` 다음 / `B` 이전 / `Space` 재생·일시정지 / `Q` 종료.
-발표 현장에서는 하드웨어 변수 때문에 버튼 기반 Stable Simulation을 권장합니다.
+키보드 보조 입력은 `N`(다음), `B`(이전), `Space`(재생·일시정지), `Q`(종료)입니다.
 
 ### 실제 OS 키 입력
 
-```bash
-python -m pip install pyautogui
-```
+실제 앱 제어를 시연할 때는 [OS 실행 운영 가이드](docs/operations.md)의 설치·설정·활성 창 확인 절차를 따릅니다.
 
-```env
-SO_ENABLE_OS_ACTIONS=true
-```
-
-키 입력 직전에 대상 앱이 활성 창인지 확인하고, 아니면 키를 보내지 않고 `FAILED`로 기록합니다(SPEC I-6).
-대상 앱 이름은 `services/action_executor.py`의 `TARGET_WINDOWS`에서 조정합니다. 검증을 끄는
-`SO_REQUIRE_ACTIVE_WINDOW=false`는 활성 창 확인 수단이 없는 환경(X11/Wayland)에서만 쓰는 최후 수단입니다.
-
-전체 환경 변수는 [config.py](src/silent_orchestra/config.py)에 있습니다.
-
-## 검증
+## 테스트
 
 ```bash
-python -m pip install -e ".[dev]" && python -m pytest -q
+python -m pip install -e "./backend[dev]"
+python -m pytest backend/tests -q
+python backend/scripts/validate_sqlite.py --schema backend/sql/schema.sql --seed backend/sql/seed.sql --queries backend/sql/queries.sql --tests backend/sql/tests.sql --report backend/sql/validation-report.json
 ```
 
-```bash
-python scripts/validate_sqlite.py --schema sql/schema.sql --seed sql/seed.sql --queries sql/queries.sql --tests sql/tests.sql --report sql/validation-report.json
-```
+자동 검증 설정은 [CI 워크플로](.github/workflows/ci.yml), 실행 결과는 [작업 현황](tasks.md#검증-기록)에서 관리합니다.
 
-현재: pytest 21 passed, SQLite 38 statements passed. 수용 기준은 [SPEC.md](SPEC.md#완료-기준) 참고.
+## 관련 문서
 
-## 구조
-
-```text
-SPEC.md          규범적 규칙(충돌 시 우선)
-PLAN.md          현재 상태·위험·보류 항목
-TASKS.md         남은 실행 항목
-docs/            기획·아키텍처·ERD·데모 대본·Q&A·결정 로그·디자인 시스템
-design/          design-tokens.json (구현 토큰: src/silent_orchestra/static/tokens.css)
-sql/             schema, seed, queries, tests, 검증 보고서
-src/silent_orchestra/  FastAPI 백엔드(routers/ + services/)와 웹 UI(static/)
-scripts/         SQLite 검증, 웹캠 모션 클라이언트
-tests/           API·DB·웹캠 클라이언트 테스트
-assets/          다이어그램 소스(.dot), 브랜드 아이콘
-```
-
-## 개인정보 보호
-
-원본 영상 저장·얼굴 인식·클라우드 업로드를 하지 않습니다. 모션 특징 벡터와 맥락만 로컬에 남으며,
-DB CHECK 제약으로 강제됩니다. 규칙 전문은 [SPEC.md](SPEC.md#입력개인정보-fr-01-fr-03-fr-14-fr-17) P-1~P-4.
+| 문서 | 내용 |
+| --- | --- |
+| [spec.md](spec.md) | 요구사항·개인정보·승인 및 실행 규칙·완료 기준 |
+| [plan.md](plan.md) | 구현 방향·검증 전략·제약 및 확장 조건 |
+| [tasks.md](tasks.md) | 진행 현황·검증 결과·남은 작업 |
+| [프로젝트 브리프](docs/brief.md) | 배경·대상 사용자·핵심 가치 |
+| [아키텍처](docs/architecture.md) | 처리 흐름·코드 위치 |
+| [데이터 설계](docs/erd.md) | ERD·테이블·SQL 산출물 |
+| [디자인](docs/design.md) | UI·시각 디자인 기준 |
+| [데모 대본](docs/demo-script.md) | 발표 순서·조작·실패 시 대체 흐름 |
+| [운영 가이드](docs/operations.md) | OS 실행 설정·권한·활성 창 확인·실패 대응 |
+| [Q&A](docs/qna.md) | 예상 질문과 답변 |
+| [결정 로그](docs/decision-log.md) | 설계 결정과 근거 |
+| [작업 지침](AGENTS.md) | 문서별 역할·변경 원칙 |

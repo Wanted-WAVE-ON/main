@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..database import get_db
 from ..schemas import DemoBootstrapResponse
+from ..services.action_catalog import ACTION_LABELS
 from ..services.demo_service import ensure_demo_user, reset_demo_user
 
 router = APIRouter(prefix="/demo", tags=["demo"])
@@ -12,6 +13,7 @@ router = APIRouter(prefix="/demo", tags=["demo"])
 def _demo_state(user) -> dict:
     return {
         "user": user,
+        "intent_labels": ACTION_LABELS,
         "suggestion_threshold": settings.suggestion_threshold,
         "auto_execution_threshold": settings.auto_execution_threshold,
         "os_actions_enabled": settings.enable_os_actions,

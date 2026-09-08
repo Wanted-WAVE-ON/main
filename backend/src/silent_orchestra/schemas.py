@@ -212,6 +212,7 @@ class DashboardResponse(BaseModel):
 
 class DemoBootstrapResponse(BaseModel):
     user: UserRead
+    intent_labels: dict[str, str]
     suggestion_threshold: int
     auto_execution_threshold: float
     os_actions_enabled: bool

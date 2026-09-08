@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +11,7 @@ from .database import SessionLocal, init_db
 from .routers import agent, demo, health, users
 from .services.demo_service import ensure_demo_user
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
+STATIC_DIR = PROJECT_ROOT / "frontend"
 
 
 @asynccontextmanager

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import uvicorn
 
-SRC = Path(__file__).resolve().parent / "src"
+SRC = Path(__file__).resolve().parent / "backend" / "src"
 
 if __name__ == "__main__":
     uvicorn.run(
