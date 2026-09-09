@@ -6,39 +6,38 @@
   <meta name="description" content="SilentOrchestra 2.0 — 개인의 몸짓 언어를 학습하는 Spatial AI Agent" />
   <title>SilentOrchestra 2.0</title>
   <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/workbench.css" />
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="SilentOrchestra 홈">
       <span class="brand-mark" aria-hidden="true"><i></i></span>
-      <span class="brand-copy"><strong>SilentOrchestra</strong><small>Personalized Spatial Agent</small></span>
+      <span class="brand-copy"><strong>SilentOrchestra</strong></span>
     </a>
     <div class="top-actions">
-      <span class="privacy-badge"><span class="status-dot" aria-hidden="true"></span>Local-first</span>
+      <span class="privacy-badge">로컬 실행</span>
       <a class="ghost-button api-link" href="/docs" target="_blank" rel="noreferrer">API</a>
       <button class="ghost-button danger" id="resetButton" type="button">초기화</button>
     </div>
   </header>
 
+  <div class="workspace-heading"><div><h2>제스처 학습</h2><p>몸짓과 행동을 연결하고, 학습한 기억을 관리합니다.</p></div></div>
   <main class="workspace">
     <section class="center-stage" aria-label="제스처 워크벤치">
       <section class="agent-stage" id="agentStage" aria-labelledby="stageTitle">
         <div class="agent-copy">
-<div id="dashboardConnection" role="alert" hidden>대시보드 갱신 실패 — 표시된 정보는 최신이 아닐 수 있습니다. 자동 재시도 중입니다. <button id="retryDashboard" type="button">지금 재시도</button></div><p>현재 맥락 학습 진행 <strong id="learningProgress" aria-live="polite">0/3</strong></p>
-          <span class="status-line"><i aria-hidden="true"></i><span id="agentStatus">공간을 이해하는 중</span></span>
-          <h1 id="stageTitle">몸짓을 자연스럽게<br />사용해 보세요</h1>
-          <p id="stageDescription">별도의 제스처를 외울 필요가 없습니다. AI가 반복되는 행동과 맥락을 관찰합니다.</p>
+<div id="dashboardConnection" role="alert" hidden>대시보드 갱신 실패 — 표시된 정보는 최신이 아닐 수 있습니다. 자동 재시도 중입니다. <button id="retryDashboard" type="button">지금 재시도</button></div>
+          <span class="status-line"><span class="agent-orb" id="agentOrb" aria-hidden="true"><span class="orb-core"></span></span><span id="agentStatus">입력 대기</span></span>
+          <h1 id="stageTitle">몸짓을 선택해 주세요</h1>
+          <p id="stageDescription">아래에서 몸짓을 선택한 뒤, 연결할 행동을 알려주세요.</p>
         </div>
-        <div class="agent-signal" aria-hidden="true">
-          <div class="agent-orb" id="agentOrb"><span class="orb-core"></span></div>
-          <span>LOCAL SIGNAL</span>
-        </div>
+        <div class="learning-strip"><span>현재 맥락의 학습 진행</span><strong id="learningProgress" aria-live="polite">0/3</strong></div>
       </section>
 
       <section class="gesture-console panel" aria-labelledby="gestureTitle">
         <div class="panel-heading">
-          <div><h2 id="gestureTitle">몸짓 발생시키기</h2><p>현재 맥락에서 제스처를 관찰합니다.</p></div>
-          <span class="mode-pill">Stable simulation</span>
+          <div><h2 id="gestureTitle">1. 몸짓 선택</h2><p>버튼으로 동작을 입력합니다.</p></div>
+          <span class="mode-pill">버튼 시뮬레이션</span>
         </div>
         <div class="gesture-grid" id="gestureGrid">
           <button class="gesture-button" data-motion="swipe" data-direction="right" data-label="오른쪽 손짓" type="button"><span class="gesture-symbol" aria-hidden="true">→</span><span><strong>오른쪽 손짓</strong><small>Swipe right</small></span></button>
@@ -50,7 +49,7 @@
 
       <section class="teaching-card panel" id="teachingCard" aria-labelledby="teachingTitle" aria-live="polite">
         <div class="teaching-state">
-          <span class="teaching-icon" aria-hidden="true">AI</span>
+          <span class="teaching-icon" aria-hidden="true">02</span>
           <div><h2 id="teachingTitle">먼저 몸짓을 발생시켜 주세요</h2><p id="teachingDescription">학습 전에는 아무 동작도 자동 실행하지 않습니다.</p></div>
         </div>
         <div class="action-buttons" id="actionButtons"></div>
@@ -74,12 +73,12 @@
       </section>
 
       <section class="panel interpretation-panel" aria-labelledby="interpretationTitle">
-        <div class="panel-heading"><h2 id="interpretationTitle">Agent 해석</h2></div>
+        <div class="panel-heading"><h2 id="interpretationTitle">이 맥락에서의 해석</h2></div>
         <div id="interpretationList" class="interpretation-list"><div class="empty-mini">이 상황에서 학습된 몸짓이 아직 없습니다.</div></div>
       </section>
 
       <section class="panel privacy-panel" aria-labelledby="privacyTitle">
-        <div class="privacy-title"><span class="shield" aria-hidden="true">LOCK</span><h2 id="privacyTitle">카메라는 기억하지 않습니다</h2></div>
+        <div class="privacy-title"><h2 id="privacyTitle">개인정보 보호</h2></div>
         <div class="privacy-flow" aria-label="개인정보 보호 처리 흐름"><span>Camera</span><b aria-hidden="true">→</b><span>Motion features</span><b aria-hidden="true">→</b><span>Frame discarded</span></div>
         <ul class="check-list">
           <li>Raw video storage <strong>OFF</strong></li>
@@ -91,15 +90,14 @@
 
     <aside class="column right-column" aria-label="학습 근거">
       <section class="panel metrics-panel" aria-label="학습 지표">
-        <div class="metric"><span>Observed</span><strong id="metricObservations">0</strong></div>
-        <div class="metric"><span>Learned</span><strong id="metricMemories">0</strong></div>
-        <div class="metric"><span>Pending</span><strong id="metricPending">0</strong></div>
+        <div class="metric"><span>관찰한 몸짓</span><strong id="metricObservations">0</strong></div>
+        <div class="metric"><span>학습한 기억</span><strong id="metricMemories">0</strong></div>
+        <div class="metric"><span>대기 중 제안</span><strong id="metricPending">0</strong></div>
       </section>
 
       <section class="panel suggestion-panel" id="suggestionPanel" aria-labelledby="suggestionTitle">
         <div class="panel-heading">
           <div><h2 id="suggestionTitle">새로운 패턴</h2><p>Agent가 제안한 학습 후보</p></div>
-          <span class="learning-badge">LEARNING</span>
         </div>
         <div id="suggestionContent" class="suggestion-content"><div class="empty-state"><span aria-hidden="true">—</span><p>같은 몸짓과 후속 행동이 3회 반복되면 Agent가 기억을 제안합니다.</p></div></div>
       </section>
