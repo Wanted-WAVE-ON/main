@@ -90,3 +90,5 @@ UI는 Idle(공간 이해 대기), Listening(모션·Context 분석), Observation
 - P-1~P-4, M-1, I-6 충족; 맥락 분기 데모 시나리오 100% 통과; D-1~D-3 초기화·재학습 통과.
 - 핵심 테스트와 SQL 계약 검증 전부 통과.
 - 핵심 루프 데모 90초 이내, 발표 대본 3분 이내.
+
+FR-16 Reset 응답은 기존 bootstrap 상태 필드에 deleted_counts를 추가한다. demo-user에 속한 contexts, gesture_observations, actions, gesture_patterns, agent_suggestions, executions, feedback의 삭제 건수를 반환하며 다른 사용자는 보존한다.

@@ -443,3 +443,120 @@ def test_reset_is_refused_outside_demo_mode(client, monkeypatch):
 
     assert client.post("/api/v1/demo/reset").status_code == 403
     assert dashboard(client)["counts"]["learned_memories"] == 1
+
+
+def test_reset_counts_all_demo_rows_preserves_other_user_and_relearns(client, db_session):
+    from sqlalchemy import func, select
+    from silent_orchestra.models import (
+        User, Context, GestureObservation, Action, GesturePattern,
+        AgentSuggestion, Execution, Feedback,
+    )
+    models = (Context, GestureObservation, Action, GesturePattern, AgentSuggestion, Execution, Feedback)
+    train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
+    execution = observe(client)["inference"]["execution"]
+    feedback(client, execution["id"], "CORRECT")
+    db_session.add(User(id="other-user", name="Other"))
+    db_session.commit()
+    payload = {"user_id": "other-user", "context": {"activity": "music", "active_app": "Spotify"},
+               "gesture": {"motion_type": "swipe", "direction": "left"}}
+    assert client.post("/api/v1/observe", json=payload).status_code == 200
+    before_other = client.get("/api/v1/dashboard?user_id=other-user").json()
+    expected = {model.__tablename__: db_session.scalar(select(func.count()).select_from(model).where(model.user_id == USER)) for model in models}
+    assert all(count > 0 for count in expected.values())
+    result = client.post("/api/v1/demo/reset")
+    assert result.status_code == 200
+    assert result.json()["deleted_counts"] == expected
+    for model in models:
+        assert db_session.scalar(select(func.count()).select_from(model).where(model.user_id == USER)) == 0
+    assert client.get("/api/v1/dashboard?user_id=other-user").json() == before_other
+    assert dashboard(client)["context"] is None
+    for attempt in range(1, 4):
+        event = observe(client)
+        learned = teach(client, event["observation"]["id"], "NEXT_SLIDE", "powerpoint")
+        assert learned["progress_current"] == attempt
+        assert (learned["suggestion"] is not None) == (attempt == 3)
+
+
+def test_reset_commit_failure_restores_every_table(client, db_session, monkeypatch):
+    import pytest
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+    from silent_orchestra.models import User, Context, GestureObservation, Action, GesturePattern, AgentSuggestion, Execution, Feedback
+    models = (User, Context, GestureObservation, Action, GesturePattern, AgentSuggestion, Execution, Feedback)
+    train_and_accept(client, "presentation", "PowerPoint", "NEXT_SLIDE", "powerpoint")
+    feedback(client, observe(client)["inference"]["execution"]["id"], "CORRECT")
+    def snapshot():
+        return {model.__tablename__: set(db_session.scalars(select(model.id)).all()) for model in models}
+    before = snapshot()
+    def fail_commit(self):
+        self.flush()
+        raise RuntimeError("commit failed after recreation")
+    with monkeypatch.context() as patch:
+        patch.setattr(Session, "commit", fail_commit)
+        with pytest.raises(RuntimeError):
+            client.post("/api/v1/demo/reset")
+    assert snapshot() == before
+    assert client.post("/api/v1/demo/reset").status_code == 200
+
+
+def test_privacy_openapi_observe_contract_is_closed(client):
+    schema = client.get("/openapi.json").json()
+    request_schema = schema["paths"]["/api/v1/observe"]["post"]["requestBody"]["content"]["application/json"]["schema"]
+    assert request_schema["$ref"].endswith("/ObserveRequest")
+    expected = {
+        "ObserveRequest": {"user_id", "context", "gesture", "attempt_inference"},
+        "ContextInput": {"active_app", "activity", "space", "device"},
+        "GestureInput": {"motion_type", "direction", "duration_ms", "embedding"},
+    }
+    for name, fields in expected.items():
+        model = schema["components"]["schemas"][name]
+        assert model["additionalProperties"] is False
+        assert set(model["properties"]) == fields
+    embedding = schema["components"]["schemas"]["GestureInput"]["properties"]["embedding"]
+    array = next(item for item in embedding["anyOf"] if item["type"] == "array")
+    assert array["items"]["type"] == "number"
+
+
+def test_privacy_rejects_each_raw_field_without_writing_data(client):
+    import copy
+    payload = {"user_id": USER, "context": {"active_app": "PowerPoint", "activity": "presentation"},
+               "gesture": {"motion_type": "swipe", "direction": "right"}}
+    before = dashboard(client)
+    for location in (None, "context", "gesture"):
+        for field in ("frame", "image", "video", "face", "face_embedding", "frame_stored"):
+            invalid = copy.deepcopy(payload)
+            target = invalid if location is None else invalid[location]
+            target[field] = True if field == "frame_stored" else "raw-data"
+            response = client.post("/api/v1/observe", json=invalid)
+            assert response.status_code == 422, (location, field, response.text)
+    assert dashboard(client) == before
+
+
+def test_privacy_db_rejects_raw_frame_insert_and_update(client, db_engine):
+    import pytest
+    from sqlalchemy import inspect
+    from sqlalchemy.exc import IntegrityError
+    observation = observe(client)["observation"]
+    with db_engine.connect() as connection:
+        row = connection.exec_driver_sql(
+            "SELECT frame_stored FROM gesture_observations WHERE id = ?", (observation["id"],)
+        ).one()
+        assert row[0] == 0
+    columns = inspect(db_engine).get_columns("gesture_observations")
+    assert {column["name"] for column in columns} == {
+        "id", "user_id", "context_id", "gesture_key", "gesture_embedding",
+        "motion_type", "direction", "duration_ms", "frame_stored", "detected_at",
+    }
+    assert not any("BLOB" in str(column["type"]).upper() for column in columns)
+    statements = [
+        ("UPDATE gesture_observations SET frame_stored = 1 WHERE id = ?", (observation["id"],)),
+        ("""INSERT INTO gesture_observations
+            (id, user_id, context_id, gesture_key, gesture_embedding, motion_type, direction, duration_ms, frame_stored, detected_at)
+            SELECT 'forbidden-frame', user_id, context_id, gesture_key, gesture_embedding, motion_type, direction, duration_ms, 1, detected_at
+            FROM gesture_observations WHERE id = ?""", (observation["id"],)),
+    ]
+    for sql, parameters in statements:
+        with pytest.raises(IntegrityError, match="ck_raw_frame_never_stored"):
+            with db_engine.begin() as connection:
+                connection.exec_driver_sql(sql, parameters)
+    assert dashboard(client)["counts"]["observations"] == 1

@@ -16,3 +16,8 @@
 - [x] 2026-09-08: main에서 Python 패키지·테스트·SQL·스크립트를 `backend/`, 정적 UI를 `frontend/`로 이동했다. 루트 `.env`·DB·데모 실행 진입점을 유지하고 CI·문서 링크를 갱신했다. pytest 23개, SQLite 38문, 프론트 4개 파일 응답·실행 진입점·설정 경로·로컬 문서 링크 검증 및 backend editable 설치 통과.
 
 - [x] 2026-09-08: 로컬 변경을 stash에 보관하고 main을 `bb50fda`로 fast-forward한 뒤 staging 상태와 미추적 파일까지 복원했다. 원격 롤백 테스트의 제거된 `bootstrap` 호출을 로컬 자동 초기화 fixture에 맞춰 삭제했다. pytest 23개 및 SQLite 검증(38문) 통과. 복원 전 stash는 백업으로 유지한다.
+- [x] 2026-09-09: waveon/main 최신 97d8e96을 반영하고 FR-17 변경을 backend 경로에 복원했다. 최소 모션 비율 0.01, 방향 판정·payload 분리, 카메라/API 오류 및 Simulation 안내를 보완했다. 전체 pytest 35개 통과. 실제 하드웨어 수용 기준은 [검증 기록](docs/fr-17-validation.md)에 미체크로 유지한다.
+- [x] FR-15: Dashboard 오류·자동 복구, polling 중 제안 선택 보존, 외부 학습 진행률 코드 보완 및 자동 테스트 완료. 브라우저 검증은 별도 진행한다.
+- [x] 2026-09-09: FR-15 Dashboard 오류·재시도, 중복 조회 방지, 제안 편집 보존, 외부 학습 진행률 및 실패 dialog 설명을 보완했다. Node 회귀 테스트 3개 통과. 브라우저 수용 기준은 [FR-15 검증 기록](docs/fr-15-validation.md)에 미체크로 남긴다.
+- [x] FR-16: 삭제 건수 응답 및 Feedback 포함 전체 삭제·타 사용자 보존·3회 재학습·commit 실패 롤백 검증 완료. 전체 pytest 37개 통과. [검증 기록](docs/fr-16-validation.md), 브라우저 재시연은 미완료.
+- [x] FR-14: 원본 필드 18개 비정상 요청·OpenAPI 허용 계약·DB INSERT/UPDATE CHECK 검증 추가. 전체 pytest 40개 및 SQLite 38문 통과. [검증 기록](docs/fr-14-validation.md)의 실제 카메라 네트워크 캡처 항목은 미완료.
