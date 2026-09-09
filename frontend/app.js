@@ -41,6 +41,8 @@ let lastGestureLabel = null;
 let lastGestureSymbol = null;
 let lastExecution = null;
 let dashboardState = null;
+let dashboardRequest = null;
+let suggestionSignature = null;
 let lastGestureButton = null;
 // Filled from /demo/bootstrap so the labels have one source of truth.
 let intentLabels = {};
@@ -273,9 +275,9 @@ function showActionOverlay(inference) {
   byId("overlayAction").textContent = failed
     ? `${intentLabel(inference.intent)} 실행 실패`
     : intentLabel(inference.intent);
-  byId("overlayConfidence").textContent = failed
-    ? executionError(inference.execution)
-    : `Learned gesture / ${Math.round(inference.confidence * 100)}%`;
+  byId("overlayConfidence").textContent =
+    `${currentContext} / ${Math.round(inference.confidence * 100)}%`
+    + (failed ? ` / ${executionError(inference.execution)}` : "");
   // ponytail: no auto-close timer - the feedback buttons live in here, and a
   // presenter narrating the execution needs longer than any timeout we'd pick.
   // Esc and a backdrop click already dismiss it.
@@ -306,6 +308,9 @@ async function submitFeedback(type) {
 
 function renderSuggestions(suggestions, candidates) {
   const host = byId("suggestionContent");
+  const signature = JSON.stringify([suggestions, candidates, intentLabels]);
+  if (signature === suggestionSignature) return;
+  suggestionSignature = signature;
   if (!suggestions.length) {
     host.dataset.state = "empty";
     host.innerHTML = `<div class="empty-state"><span aria-hidden="true">—</span><p>같은 몸짓과 후속 행동이 3회 반복되면 Agent가 기억을 제안합니다.</p></div>`;
@@ -393,6 +398,17 @@ function renderEvents(events) {
 }
 
 async function refreshDashboard() {
+  if (dashboardRequest) return dashboardRequest;
+  dashboardRequest = loadDashboard();
+  try {
+    return await dashboardRequest;
+  } finally {
+    dashboardRequest = null;
+  }
+}
+
+async function loadDashboard() {
+  try {
   const state = await request(`/dashboard?user_id=${encodeURIComponent(USER_ID)}`);
   dashboardState = state;
   byId("metricObservations").textContent = state.counts.observations;
@@ -402,6 +418,15 @@ async function refreshDashboard() {
   renderMemories(state.memories);
   renderInterpretations(state.memories);
   renderEvents(state.events);
+  const candidate = state.candidates.find((item) => item.context_scope === currentContext);
+  byId("learningProgress").textContent = candidate
+    ? `${Math.min(candidate.observation_count, state.threshold)}/${state.threshold}`
+    : `0/${state.threshold}`;
+  byId("dashboardConnection").hidden = true;
+  } catch (error) {
+    byId("dashboardConnection").hidden = false;
+    throw error;
+  }
 }
 
 // The webcam client posts to the API directly, so state can change without any
@@ -449,16 +474,20 @@ async function init() {
     intentLabels = (await post("/demo/bootstrap")).intent_labels;
     renderContext();
     await refreshDashboard();
-    startAutoRefresh();
   } catch (error) {
     showToast(`서버 연결 실패: ${error.message}`);
+    byId("dashboardConnection").hidden = false;
   }
+
+  startAutoRefresh();
+  byId("retryDashboard").addEventListener("click", () => refreshDashboard().catch(() => {}));
 
   all(".segment").forEach((button) => {
     button.addEventListener("click", () => {
       currentContext = button.dataset.context;
       lastObservation = null;
       renderContext();
+      refreshDashboard().catch(() => {});
       updateTeachingCard("상황이 변경되었습니다", `${contextDefinitions[currentContext].title} 맥락에서 몸짓을 관찰합니다.`);
       setAgentState(
         "",

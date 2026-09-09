@@ -1,5 +1,7 @@
 import argparse
 import time
+import math
+import sys
 from typing import Any
 
 import requests
@@ -24,9 +26,34 @@ def action_for_key(key: int, activity: str) -> tuple[str, str] | None:
     return KEY_ACTIONS.get((chr(key), activity))
 
 
-def main() -> int:
-    import cv2
+def horizontal_motion(flow, foreground_mask, threshold=1.0, min_motion_ratio=0.01):
+    """Aggregate only moving foreground pixels; never retain image data."""
     import numpy as np
+
+    dx, dy = flow[..., 0], flow[..., 1]
+    mask = (np.abs(dx) > threshold) & foreground_mask & np.isfinite(dx) & np.isfinite(dy)
+    ratio = float(np.mean(mask))
+    if ratio <= min_motion_ratio:
+        return None, ratio
+    mean_dx, mean_dy = float(np.mean(dx[mask])), float(np.mean(dy[mask]))
+    if abs(mean_dx) <= 0.3 or abs(mean_dx) <= abs(mean_dy):
+        return None, ratio
+    return ("right" if mean_dx > 0 else "left"), ratio
+
+
+def observation_payload(user_id: str, activity: str, active_app: str, direction: str):
+    if direction not in {"left", "right"}:
+        raise ValueError("Only horizontal swipes are supported")
+    return {
+        "user_id": user_id,
+        "context": {"active_app": active_app, "activity": activity,
+                    "space": "camera_demo", "device": "laptop"},
+        "gesture": {"motion_type": "swipe", "direction": direction, "duration_ms": 430},
+        "attempt_inference": True,
+    }
+
+
+def main() -> int:
 
     parser = argparse.ArgumentParser(description="Local optical-flow gesture client")
     parser.add_argument("--api-url", default="http://127.0.0.1:8000/api/v1")
@@ -36,22 +63,37 @@ def main() -> int:
     parser.add_argument("--camera", type=int, default=0)
     parser.add_argument("--threshold", type=float, default=1.0,
                         help="per-pixel horizontal flow magnitude that counts as motion")
-    parser.add_argument("--min-motion-ratio", type=float, default=0.03,
+    parser.add_argument("--min-motion-ratio", type=float, default=0.01,
                         help="fraction of ROI pixels in motion required to trigger a detection")
     parser.add_argument("--stable-frames", type=int, default=3,
                         help="consecutive frames that must agree on direction")
     args = parser.parse_args()
+
+    if not math.isfinite(args.threshold) or args.threshold <= 0:
+        parser.error("--threshold must be finite and greater than zero")
+    if not 0 < args.min_motion_ratio <= 1:
+        parser.error("--min-motion-ratio must be in (0, 1]")
+    if args.stable_frames < 1:
+        parser.error("--stable-frames must be at least 1")
+    simulation_url = args.api_url.split("/api/")[0]
+    print(f"Stable Simulation: open {simulation_url} in your browser. Q exits the camera.")
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        print('Camera dependencies missing. Install: python -m pip install -e ".[camera]"', file=sys.stderr)
+        return 1
 
     active_app = args.active_app or ("PowerPoint" if args.activity == "presentation" else "Spotify")
     teaching_keys = "N/B/Space" if args.activity == "music" else "N/B"
     key_help = "Q quit | N next | B previous"
     if args.activity == "music":
         key_help += " | Space play/pause"
-    post_json(f"{args.api_url}/demo/bootstrap", {})
-
     capture = cv2.VideoCapture(args.camera)
     if not capture.isOpened():
-        raise SystemExit("Camera could not be opened")
+        capture.release()
+        print("Camera could not be opened: check device index and camera permissions. Use Stable Simulation above.", file=sys.stderr)
+        return 1
 
     previous_gray = None
     background_model = cv2.createBackgroundSubtractorMOG2(
@@ -64,10 +106,12 @@ def main() -> int:
     overlay = "Move one hand horizontally inside the guide"
 
     try:
+        post_json(f"{args.api_url}/demo/bootstrap", {})
         while True:
             ok, frame = capture.read()
             if not ok:
-                break
+                print("Camera frame read failed. Use Stable Simulation above.", file=sys.stderr)
+                return 1
             frame = cv2.flip(frame, 1)
             height, width = frame.shape[:2]
             x1, y1 = int(width * 0.18), int(height * 0.20)
@@ -86,15 +130,12 @@ def main() -> int:
                 dx = flow[..., 0]
                 dy = flow[..., 1]
                 foreground_mask = background_model.apply(gray) > 0
-                motion_mask = (np.abs(dx) > args.threshold) & foreground_mask
-                moving_ratio = float(np.mean(motion_mask))
-                now = time.time()
-                mean_dx = mean_dy = 0.0
-                if moving_ratio > args.min_motion_ratio and now - last_detection > 1.2:
-                    mean_dx = float(np.mean(dx[motion_mask]))
-                    mean_dy = float(np.mean(dy[motion_mask]))
-                if abs(mean_dx) > 0.3 and abs(mean_dx) > abs(mean_dy):
-                    direction_history.append("right" if mean_dx > 0 else "left")
+                direction, moving_ratio = horizontal_motion(
+                    flow, foreground_mask, args.threshold, args.min_motion_ratio
+                )
+                now = time.monotonic()
+                if direction and now - last_detection >= 1.2:
+                    direction_history.append(direction)
                     direction_history = direction_history[-args.stable_frames:]
                 else:
                     direction_history.clear()
@@ -111,21 +152,9 @@ def main() -> int:
                         f"(max|dx|={max_abs_dx:.2f}, moving_ratio={moving_ratio:.1%}) "
                         f"#{detection_count}"
                     )
-                    payload = {
-                        "user_id": args.user_id,
-                        "context": {
-                            "active_app": active_app,
-                            "activity": args.activity,
-                            "space": "camera_demo",
-                            "device": "laptop",
-                        },
-                        "gesture": {
-                            "motion_type": "swipe",
-                            "direction": direction,
-                            "duration_ms": 430,
-                        },
-                        "attempt_inference": True,
-                    }
+                    payload = observation_payload(
+                        args.user_id, args.activity, active_app, direction
+                    )
                     result = post_json(f"{args.api_url}/observe", payload)
                     latest_observation_id = result["observation"]["id"]
                     inference = result["inference"]
@@ -164,6 +193,12 @@ def main() -> int:
                     overlay += " - suggestion ready in web UI"
                 print(overlay)
                 latest_observation_id = None
+    except (requests.RequestException, ValueError, KeyError, TypeError) as error:
+        print(f"API request/response failed ({type(error).__name__}). No frames saved. Use Stable Simulation above; check the API server.", file=sys.stderr)
+        return 1
+    except cv2.error:
+        print("Camera processing/display failed. Check camera permissions and display support. Use Stable Simulation above.", file=sys.stderr)
+        return 1
     finally:
         capture.release()
         cv2.destroyAllWindows()

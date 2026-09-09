@@ -1,0 +1,536 @@
+{
+  "database": ":memory:",
+  "status": "passed",
+  "foreign_keys": true,
+  "transaction_rolled_back": true,
+  "statement_count": 38,
+  "failure": null,
+  "test_conventions": {
+    "foreign_key_check": "must return zero rows",
+    "assertion_columns": "ok/pass/passed/assert_* must return one truthy value"
+  },
+  "results": [
+    {
+      "source": "schema",
+      "index": 1,
+      "sql_preview": "PRAGMA foreign_keys = ON;",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 2,
+      "sql_preview": "CREATE TABLE users ( id TEXT PRIMARY KEY, name TEXT NOT NULL CHECK (length(trim(name)) > 0), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP );",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 3,
+      "sql_preview": "CREATE TABLE contexts ( id TEXT PRIMARY KEY, user_id TEXT NOT NULL, active_app TEXT NOT NULL, activity TEXT NOT NULL CHECK (activity IN ('presentation','music')), space TEXT NOT...",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 4,
+      "sql_preview": "CREATE TABLE gesture_observations ( id TEXT PRIMARY KEY, user_id TEXT NOT NULL, context_id TEXT NOT NULL, gesture_key TEXT NOT NULL, gesture_embedding TEXT NOT NULL CHECK (json_...",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 5,
+      "sql_preview": "CREATE TABLE actions ( id TEXT PRIMARY KEY, user_id TEXT NOT NULL, observation_id TEXT NOT NULL UNIQUE, action_type TEXT NOT NULL, target TEXT NOT NULL, parameters TEXT NOT NULL...",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 6,
+      "sql_preview": "CREATE TABLE gesture_patterns ( id TEXT PRIMARY KEY, user_id TEXT NOT NULL, gesture_key TEXT NOT NULL, gesture_embedding TEXT NOT NULL CHECK (json_valid(gesture_embedding)), mot...",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 7,
+      "sql_preview": "CREATE TABLE agent_suggestions ( id TEXT PRIMARY KEY, user_id TEXT NOT NULL, gesture_pattern_id TEXT NOT NULL, suggested_intent TEXT NOT NULL, modified_intent TEXT, reason TEXT ...",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 8,
+      "sql_preview": "CREATE TABLE executions ( id TEXT PRIMARY KEY, user_id TEXT NOT NULL, gesture_pattern_id TEXT NOT NULL, observation_id TEXT NOT NULL, intent TEXT NOT NULL, target TEXT NOT NULL,...",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 9,
+      "sql_preview": "CREATE TABLE feedback ( id TEXT PRIMARY KEY, user_id TEXT NOT NULL, gesture_pattern_id TEXT NOT NULL, execution_id TEXT NOT NULL UNIQUE, feedback_type TEXT NOT NULL CHECK (feedb...",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 10,
+      "sql_preview": "CREATE INDEX ix_contexts_user_activity ON contexts(user_id, activity);",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 11,
+      "sql_preview": "CREATE INDEX ix_observations_user_gesture ON gesture_observations(user_id, gesture_key);",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 12,
+      "sql_preview": "CREATE INDEX ix_observations_detected_at ON gesture_observations(detected_at);",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 13,
+      "sql_preview": "CREATE INDEX ix_actions_user_type ON actions(user_id, action_type);",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 14,
+      "sql_preview": "CREATE INDEX ix_patterns_memory_lookup ON gesture_patterns(user_id, context_scope, status);",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 15,
+      "sql_preview": "CREATE INDEX ix_suggestions_user_status ON agent_suggestions(user_id, status);",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 16,
+      "sql_preview": "CREATE INDEX ix_executions_user_time ON executions(user_id, executed_at);",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 17,
+      "sql_preview": "CREATE INDEX ix_feedback_pattern_time ON feedback(gesture_pattern_id, created_at);",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "schema",
+      "index": 18,
+      "sql_preview": "CREATE VIEW personal_gesture_memory AS SELECT p.id, p.user_id, p.gesture_key, p.motion_type, p.direction, p.context_scope, p.intent, p.target, p.confidence, p.observation_count,...",
+      "status": "passed",
+      "columns": [],
+      "row_count": -1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "seed",
+      "index": 1,
+      "sql_preview": "INSERT INTO users (id, name) VALUES ('user-demo', '나영');",
+      "status": "passed",
+      "columns": [],
+      "row_count": 1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "seed",
+      "index": 2,
+      "sql_preview": "INSERT INTO contexts (id, user_id, active_app, activity, space, device) VALUES ('ctx-ppt-1', 'user-demo', 'PowerPoint', 'presentation', 'meeting_room', 'laptop'), ('ctx-music-1'...",
+      "status": "passed",
+      "columns": [],
+      "row_count": 2,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "seed",
+      "index": 3,
+      "sql_preview": "INSERT INTO gesture_observations ( id, user_id, context_id, gesture_key, gesture_embedding, motion_type, direction, duration_ms, frame_stored ) VALUES ('obs-ppt-1', 'user-demo',...",
+      "status": "passed",
+      "columns": [],
+      "row_count": 2,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "seed",
+      "index": 4,
+      "sql_preview": "INSERT INTO actions ( id, user_id, observation_id, action_type, target, parameters, executed_by ) VALUES ('act-ppt-1', 'user-demo', 'obs-ppt-1', 'NEXT_SLIDE', 'powerpoint', '{}'...",
+      "status": "passed",
+      "columns": [],
+      "row_count": 2,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "seed",
+      "index": 5,
+      "sql_preview": "INSERT INTO gesture_patterns ( id, user_id, gesture_key, gesture_embedding, motion_type, direction, intent, context_scope, target, confidence, observation_count, auto_execute, s...",
+      "status": "passed",
+      "columns": [],
+      "row_count": 2,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "seed",
+      "index": 6,
+      "sql_preview": "INSERT INTO agent_suggestions ( id, user_id, gesture_pattern_id, suggested_intent, reason, confidence, status, responded_at ) VALUES ('sug-ppt-right', 'user-demo', 'pat-ppt-righ...",
+      "status": "passed",
+      "columns": [],
+      "row_count": 2,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "seed",
+      "index": 7,
+      "sql_preview": "INSERT INTO executions ( id, user_id, gesture_pattern_id, observation_id, intent, target, parameters, confidence, execution_mode, status ) VALUES ('exe-ppt-1', 'user-demo', 'pat...",
+      "status": "passed",
+      "columns": [],
+      "row_count": 1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "seed",
+      "index": 8,
+      "sql_preview": "INSERT INTO feedback ( id, user_id, gesture_pattern_id, execution_id, feedback_type ) VALUES ('fb-ppt-1', 'user-demo', 'pat-ppt-right', 'exe-ppt-1', 'CORRECT');",
+      "status": "passed",
+      "columns": [],
+      "row_count": 1,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "queries",
+      "index": 1,
+      "sql_preview": "-- 1. 현재 상황에 활성화된 Personal Gesture Memory 조회 SELECT gesture_key, context_scope, intent, target, confidence, observation_count FROM personal_gesture_memory WHERE user_id = 'user-...",
+      "status": "passed",
+      "columns": [
+        "gesture_key",
+        "context_scope",
+        "intent",
+        "target",
+        "confidence",
+        "observation_count"
+      ],
+      "row_count": 1,
+      "rows_preview": [
+        [
+          "swipe:right",
+          "presentation",
+          "NEXT_SLIDE",
+          "powerpoint",
+          0.94,
+          12
+        ]
+      ],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "queries",
+      "index": 2,
+      "sql_preview": "-- 2. 같은 제스처가 맥락별로 어떻게 달리 해석되는지 확인 SELECT gesture_key, context_scope, intent, confidence FROM personal_gesture_memory WHERE user_id = 'user-demo' AND gesture_key = 'swipe:right'...",
+      "status": "passed",
+      "columns": [
+        "gesture_key",
+        "context_scope",
+        "intent",
+        "confidence"
+      ],
+      "row_count": 2,
+      "rows_preview": [
+        [
+          "swipe:right",
+          "music",
+          "NEXT_TRACK",
+          0.91
+        ],
+        [
+          "swipe:right",
+          "presentation",
+          "NEXT_SLIDE",
+          0.94
+        ]
+      ],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "queries",
+      "index": 3,
+      "sql_preview": "-- 3. 대기 중인 Agent 제안 SELECT s.id, p.gesture_key, p.context_scope, s.suggested_intent, s.reason, s.confidence FROM agent_suggestions AS s JOIN gesture_patterns AS p ON p.id = s.g...",
+      "status": "passed",
+      "columns": [
+        "id",
+        "gesture_key",
+        "context_scope",
+        "suggested_intent",
+        "reason",
+        "confidence"
+      ],
+      "row_count": 0,
+      "rows_preview": [],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "queries",
+      "index": 4,
+      "sql_preview": "-- 4. 최근 실행과 피드백 감사 로그 SELECT e.intent, e.execution_mode, e.status, e.confidence, f.feedback_type, e.executed_at FROM executions AS e LEFT JOIN feedback AS f ON f.execution_id =...",
+      "status": "passed",
+      "columns": [
+        "intent",
+        "execution_mode",
+        "status",
+        "confidence",
+        "feedback_type",
+        "executed_at"
+      ],
+      "row_count": 1,
+      "rows_preview": [
+        [
+          "NEXT_SLIDE",
+          "DRY_RUN",
+          "SIMULATED",
+          0.94,
+          "CORRECT",
+          "2026-09-09 01:43:33"
+        ]
+      ],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "queries",
+      "index": 5,
+      "sql_preview": "-- 5. Privacy 검증: 원본 프레임 저장 건수는 항상 0 SELECT COUNT(*) AS raw_frame_count FROM gesture_observations WHERE frame_stored <> 0;",
+      "status": "passed",
+      "columns": [
+        "raw_frame_count"
+      ],
+      "row_count": 1,
+      "rows_preview": [
+        [
+          0
+        ]
+      ],
+      "error": null,
+      "assertion": null
+    },
+    {
+      "source": "tests",
+      "index": 1,
+      "sql_preview": "PRAGMA foreign_key_check;",
+      "status": "passed",
+      "columns": [
+        "table",
+        "rowid",
+        "parent",
+        "fkid"
+      ],
+      "row_count": 0,
+      "rows_preview": [],
+      "error": null,
+      "assertion": "foreign_key_check returned no violations"
+    },
+    {
+      "source": "tests",
+      "index": 2,
+      "sql_preview": "SELECT CASE WHEN COUNT(*) = 8 THEN 1 ELSE 0 END AS assert_eight_core_tables FROM sqlite_master WHERE type = 'table' AND name IN ( 'users', 'contexts', 'gesture_observations', 'a...",
+      "status": "passed",
+      "columns": [
+        "assert_eight_core_tables"
+      ],
+      "row_count": 1,
+      "rows_preview": [
+        [
+          1
+        ]
+      ],
+      "error": null,
+      "assertion": "Assertion column 'assert_eight_core_tables' evaluated to true"
+    },
+    {
+      "source": "tests",
+      "index": 3,
+      "sql_preview": "SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END AS assert_no_raw_frames FROM gesture_observations WHERE frame_stored <> 0;",
+      "status": "passed",
+      "columns": [
+        "assert_no_raw_frames"
+      ],
+      "row_count": 1,
+      "rows_preview": [
+        [
+          1
+        ]
+      ],
+      "error": null,
+      "assertion": "Assertion column 'assert_no_raw_frames' evaluated to true"
+    },
+    {
+      "source": "tests",
+      "index": 4,
+      "sql_preview": "SELECT CASE WHEN COUNT(*) = 2 THEN 1 ELSE 0 END AS assert_context_specific_memories FROM personal_gesture_memory WHERE user_id = 'user-demo' AND gesture_key = 'swipe:right' AND ...",
+      "status": "passed",
+      "columns": [
+        "assert_context_specific_memories"
+      ],
+      "row_count": 1,
+      "rows_preview": [
+        [
+          1
+        ]
+      ],
+      "error": null,
+      "assertion": "Assertion column 'assert_context_specific_memories' evaluated to true"
+    },
+    {
+      "source": "tests",
+      "index": 5,
+      "sql_preview": "SELECT CASE WHEN COUNT(DISTINCT intent) = 2 THEN 1 ELSE 0 END AS assert_same_gesture_different_intents FROM personal_gesture_memory WHERE user_id = 'user-demo' AND gesture_key =...",
+      "status": "passed",
+      "columns": [
+        "assert_same_gesture_different_intents"
+      ],
+      "row_count": 1,
+      "rows_preview": [
+        [
+          1
+        ]
+      ],
+      "error": null,
+      "assertion": "Assertion column 'assert_same_gesture_different_intents' evaluated to true"
+    },
+    {
+      "source": "tests",
+      "index": 6,
+      "sql_preview": "SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END AS assert_no_pending_seed_suggestions FROM agent_suggestions WHERE status = 'PENDING';",
+      "status": "passed",
+      "columns": [
+        "assert_no_pending_seed_suggestions"
+      ],
+      "row_count": 1,
+      "rows_preview": [
+        [
+          1
+        ]
+      ],
+      "error": null,
+      "assertion": "Assertion column 'assert_no_pending_seed_suggestions' evaluated to true"
+    },
+    {
+      "source": "tests",
+      "index": 7,
+      "sql_preview": "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END AS assert_execution_feedback_link FROM executions AS e JOIN feedback AS f ON f.execution_id = e.id WHERE e.id = 'exe-ppt-1' AND f...",
+      "status": "passed",
+      "columns": [
+        "assert_execution_feedback_link"
+      ],
+      "row_count": 1,
+      "rows_preview": [
+        [
+          1
+        ]
+      ],
+      "error": null,
+      "assertion": "Assertion column 'assert_execution_feedback_link' evaluated to true"
+    }
+  ]
+}

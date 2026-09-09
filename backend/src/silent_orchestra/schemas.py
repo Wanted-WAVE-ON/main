@@ -217,3 +217,7 @@ class DemoBootstrapResponse(BaseModel):
     auto_execution_threshold: float
     os_actions_enabled: bool
     demo_mode: bool
+
+
+class DemoResetResponse(DemoBootstrapResponse):
+    deleted_counts: dict[str, int]

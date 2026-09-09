@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..database import get_db
-from ..schemas import DemoBootstrapResponse
+from ..schemas import DemoBootstrapResponse, DemoResetResponse
 from ..services.action_catalog import ACTION_LABELS
 from ..services.demo_service import ensure_demo_user, reset_demo_user
 
@@ -26,13 +26,14 @@ def bootstrap(db: Session = Depends(get_db)) -> dict:
     return _demo_state(ensure_demo_user(db))
 
 
-@router.post("/reset", response_model=DemoBootstrapResponse)
+@router.post("/reset", response_model=DemoResetResponse)
 def reset(db: Session = Depends(get_db)) -> dict:
     if not settings.demo_mode:
         raise HTTPException(
             status_code=403, detail="Demo reset is disabled outside demo mode."
         )
-    return _demo_state(reset_demo_user(db))
+    user, deleted_counts = reset_demo_user(db)
+    return {**_demo_state(user), "deleted_counts": deleted_counts}
 
 
 @router.get("/privacy")
