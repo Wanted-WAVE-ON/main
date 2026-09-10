@@ -506,7 +506,7 @@ def test_privacy_openapi_observe_contract_is_closed(client):
     expected = {
         "ObserveRequest": {"user_id", "context", "gesture", "attempt_inference"},
         "ContextInput": {"active_app", "activity", "space", "device"},
-        "GestureInput": {"motion_type", "direction", "duration_ms", "embedding"},
+        "GestureInput": {"motion_type", "direction", "duration_ms", "embedding", "speed", "amplitude"},
     }
     for name, fields in expected.items():
         model = schema["components"]["schemas"][name]

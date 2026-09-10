@@ -1,15 +1,22 @@
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..models import Action, AgentSuggestion, Context, GestureObservation, GesturePattern
 from ..schemas import TeachRequest
 from .action_catalog import CONTEXT_INTENTS, action_label
-from .gesture_encoder import running_average
+
+LEARNING_WINDOW = timedelta(days=30)
+MAX_LEARNING_ACTIONS = 20
+
+
+def _utc(value: datetime) -> datetime:
+    # SQLite returns naive values even for DateTime(timezone=True).
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
 def _confidence(winner_count: int, total_count: int) -> float:
@@ -50,6 +57,7 @@ def record_user_action(
     if request.action_type not in CONTEXT_INTENTS.get(context.activity, ()):
         raise ValueError("action_type is not allowed for this context")
 
+    now = datetime.now(timezone.utc)
     action = Action(
         id=str(uuid4()),
         user_id=request.user_id,
@@ -58,27 +66,65 @@ def record_user_action(
         target=request.target,
         parameters=request.parameters,
         executed_by="USER",
+        executed_at=now,
     )
     db.add(action)
     db.flush()
 
-    # Every action this user took after the same gesture in the same activity.
+    # Bound the evidence so a long-established habit can still change. Agent
+    # executions are never votes for the mapping that produced them.
     rows = db.execute(
-        select(Action.action_type, Action.target)
+        select(Action, GestureObservation)
         .join(GestureObservation, Action.observation_id == GestureObservation.id)
         .join(Context, GestureObservation.context_id == Context.id)
         .where(
             Action.user_id == request.user_id,
+            Action.executed_by == "USER",
+            Action.executed_at >= now - LEARNING_WINDOW,
+            Action.executed_at <= now,
             GestureObservation.gesture_key == observation.gesture_key,
             Context.activity == context.activity,
         )
+        .order_by(Action.executed_at.desc(), Action.id.desc())
+        .limit(MAX_LEARNING_ACTIONS)
     ).all()
 
-    ranked_actions = Counter(row.action_type for row in rows).most_common(2)
+    ranked_actions = Counter(row.Action.action_type for row in rows).most_common(2)
     winning_intent, winning_count = ranked_actions[0]
     has_unique_winner = len(ranked_actions) == 1 or winning_count > ranked_actions[1][1]
     confidence = _confidence(winning_count, len(rows))
-    winning_target = next(row.target for row in rows if row.action_type == winning_intent)
+    winning_rows = [row for row in rows if row.Action.action_type == winning_intent]
+    # Rows are newest first, so Counter's insertion order breaks target ties
+    # using the most recent target rather than an arbitrary database row.
+    winning_target = Counter(row.Action.target for row in winning_rows).most_common(1)[0][0]
+    latest_winner = winning_rows[0].GestureObservation
+    embedding_size = len(latest_winner.gesture_embedding)
+    embeddings = [
+        row.GestureObservation.gesture_embedding
+        for row in winning_rows
+        if len(row.GestureObservation.gesture_embedding) == embedding_size
+    ]
+    winning_embedding = [
+        round(sum(values) / len(embeddings), 6)
+        for values in zip(*embeddings, strict=True)
+    ]
+
+    last_rejected_at = db.scalar(
+        select(func.max(AgentSuggestion.responded_at))
+        .join(GesturePattern, AgentSuggestion.gesture_pattern_id == GesturePattern.id)
+        .where(
+            GesturePattern.user_id == request.user_id,
+            GesturePattern.gesture_key == observation.gesture_key,
+            GesturePattern.context_scope == context.activity,
+            AgentSuggestion.suggested_intent == winning_intent,
+            AgentSuggestion.status == "REJECTED",
+        )
+    )
+    fresh_count = sum(
+        last_rejected_at is None or _utc(row.Action.executed_at) > _utc(last_rejected_at)
+        for row in winning_rows
+    )
+    rejection_cleared = last_rejected_at is None or fresh_count >= settings.suggestion_threshold
 
     pattern = db.scalar(
         select(GesturePattern).where(
@@ -94,75 +140,79 @@ def record_user_action(
             id=str(uuid4()),
             user_id=request.user_id,
             gesture_key=observation.gesture_key,
-            gesture_embedding=observation.gesture_embedding,
-            motion_type=observation.motion_type,
-            direction=observation.direction,
+            gesture_embedding=winning_embedding,
+            motion_type=latest_winner.motion_type,
+            direction=latest_winner.direction,
             intent=winning_intent,
             context_scope=context.activity,
             target=winning_target,
             confidence=confidence,
             observation_count=winning_count,
             auto_execute=False,
-            status="CANDIDATE",
+            status="CANDIDATE" if rejection_cleared else "REJECTED",
         )
         db.add(pattern)
     else:
-        pattern.gesture_embedding = running_average(
-            pattern.gesture_embedding,
-            observation.gesture_embedding,
-            pattern.observation_count,
-        )
+        pattern.gesture_embedding = winning_embedding
         pattern.target = winning_target
         pattern.confidence = confidence
         pattern.observation_count = winning_count
-        if pattern.status == "REJECTED":
+        if pattern.status == "REJECTED" and rejection_cleared:
             pattern.status = "CANDIDATE"
 
     db.flush()
 
-    suggestion: AgentSuggestion | None = None
-    if not has_unique_winner:
-        # The gesture is ambiguous again: stop auto-executing it and withdraw
-        # any suggestion that was still waiting for an answer.
-        scope_patterns = db.scalars(
-            select(GesturePattern).where(
-                GesturePattern.user_id == request.user_id,
-                GesturePattern.gesture_key == observation.gesture_key,
-                GesturePattern.context_scope == context.activity,
-            )
-        ).all()
-        for item in scope_patterns:
-            if item.status == "ACTIVE":
-                item.status = "CANDIDATE"
-                item.auto_execute = False
-        for pending in db.scalars(
-            select(AgentSuggestion).where(
-                AgentSuggestion.gesture_pattern_id.in_([item.id for item in scope_patterns]),
-                AgentSuggestion.status == "PENDING",
-            )
-        ):
-            db.delete(pending)
-    elif winning_count >= settings.suggestion_threshold:
-        suggestion = db.scalar(
-            select(AgentSuggestion).where(
-                AgentSuggestion.gesture_pattern_id == pattern.id,
-                AgentSuggestion.status == "PENDING",
-            )
+    scope_patterns = db.scalars(
+        select(GesturePattern).where(
+            GesturePattern.user_id == request.user_id,
+            GesturePattern.gesture_key == observation.gesture_key,
+            GesturePattern.context_scope == context.activity,
         )
-        if suggestion is None and pattern.status != "ACTIVE":
+    ).all()
+    for item in scope_patterns:
+        if item.status == "ACTIVE" and (not has_unique_winner or item.id != pattern.id):
+            item.status = "CANDIDATE"
+            item.auto_execute = False
+
+    eligible = (
+        has_unique_winner
+        and winning_count >= settings.suggestion_threshold
+        and rejection_cleared
+        and pattern.status != "ACTIVE"
+    )
+    suggestion: AgentSuggestion | None = None
+    for pending in db.scalars(
+        select(AgentSuggestion).where(
+            AgentSuggestion.gesture_pattern_id.in_([item.id for item in scope_patterns]),
+            AgentSuggestion.status == "PENDING",
+        )
+    ):
+        if eligible and pending.gesture_pattern_id == pattern.id and suggestion is None:
+            suggestion = pending
+        else:
+            db.delete(pending)
+
+    if eligible:
+        reason = (
+            f"{context.activity} 상황에서 최근 30일 내 최대 20건의 조작 중 "
+            f"유사한 동작 후 '{action_label(winning_intent)}' 행동이 "
+            f"{winning_count}회 관찰되었습니다."
+        )
+        if suggestion is None:
             suggestion = AgentSuggestion(
                 id=str(uuid4()),
                 user_id=request.user_id,
                 gesture_pattern_id=pattern.id,
                 suggested_intent=winning_intent,
-                reason=(
-                    f"{context.activity} 상황에서 유사한 동작 후 "
-                    f"'{action_label(winning_intent)}' 행동이 {winning_count}회 관찰되었습니다."
-                ),
+                reason=reason,
                 confidence=confidence,
                 status="PENDING",
             )
             db.add(suggestion)
+        else:
+            suggestion.suggested_intent = winning_intent
+            suggestion.reason = reason
+            suggestion.confidence = confidence
 
     db.commit()
     return action, pattern, suggestion
