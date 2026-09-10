@@ -9,16 +9,19 @@
 ```sh
 python -m pip install -e "./backend[camera,dev]"
 python run_demo.py
-# 별도 터미널
-python backend/scripts/webcam_gesture_client.py --activity presentation
+# 별도 터미널 (Windows 실기 관측)
+python backend/scripts/webcam_gesture_client.py --learn
+# 다른 플랫폼 또는 키 훅을 쓸 수 없을 때
+python backend/scripts/webcam_gesture_client.py --input-mode labels --activity presentation --learn
 ```
 
-기본 threshold=1.0, min-motion-ratio=0.01, stable-frames=3, 감지 간격은 monotonic clock 기준 1.2초다.
+기본 threshold=1.0, min-motion-ratio=0.01, stable-frames=3, 재감지 간격은 monotonic clock 기준 1.2초다.
 좌우 반전된 미리보기의 방향을 사용하며 ROI의 움직이는 전경 픽셀만 집계한다.
-duration_ms=430은 고정값이며 실측이 아니다. motion_type, direction, duration_ms와 context를 전송하고 gesture_key와 embedding은 서버가 생성한다.
+duration_ms는 움직임 구간의 실측값이고 speed·amplitude는 ROI 너비 기준 실측 특징이다. motion_type, direction, 이 특징과 context를 전송하고 gesture_key와 embedding은 서버가 생성한다.
 프레임은 메모리에서만 처리하고 저장·전송하지 않는다.
 
-N/B는 Context별 다음·이전, Space는 Music 재생/일시정지 Teach다.
+관측 모드(기본, Windows)는 서버가 활성 창으로 맥락을 판정하고, 몸짓 관찰 후 5초 안에 같은 앱·맥락에서 실제로 누른 첫 탐색·미디어 키만 Teach로 연결한다. 합성 키·수정 키 조합·길게 눌러 반복된 키·자동 실행된 관찰·만료된 관찰은 제외한다.
+라벨 모드(`--input-mode labels`)는 N/B로 Context별 다음·이전, `--activity music`에서는 Space로 재생/일시정지를 사람이 라벨링하며 `/teach`만 호출한다.
 Q로 종료한 뒤 출력된 서버 URL에서 버튼 기반 Stable Simulation을 사용할 수 있다.
 카메라 열기·읽기·처리 또는 API 실패 시 오류를 출력하고 카메라를 해제한다.
 API 오류는 자동 재전송하지 않는다. 서버 연결 복구 후 Simulation을 사용하거나 클라이언트를 재실행한다.
@@ -26,12 +29,13 @@ API 오류는 자동 재전송하지 않는다. 서버 연결 복구 후 Simulat
 
 ## 자동 검증
 
-`python -m pytest backend/tests -q`: 35 passed (카메라 의존성 설치 환경).
+`python -m pytest backend/tests -q`: 78 passed (카메라 의존성 설치 환경).
 NumPy가 없는 환경에서는 해당 의존성이 필요한 테스트를 건너뛴다.
-합성 flow의 좌우 방향, 작은 모션·수직·정지·배경 제외, Context별 키 매핑,
-feature-only payload의 Observation API 처리와 서버 embedding 생성,
+합성 flow의 좌우 방향과 amplitude, 작은 모션·수직·정지·배경 제외, ROI 기준 속도·진폭의 정규화·클램프,
+측정 payload의 Observation API 처리와 서버 11차원 embedding 생성,
+관측 모드 Teach 연결 규칙(같은 맥락의 첫 키, 창 만료), 상충 플래그 거부,
 카메라 열기·읽기 실패 및 네트워크 오류 시 자원 해제를 검증한다.
-이는 실제 카메라 인식률을 보장하지 않는다.
+실기 키 훅과 실제 카메라 인식률은 보장하지 않는다.
 
 ## 현장 수용 기준
 

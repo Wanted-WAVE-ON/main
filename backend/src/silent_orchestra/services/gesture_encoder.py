@@ -27,13 +27,30 @@ def gesture_key(motion_type: str, direction: str) -> str:
     return f"{canonical(motion_type)}:{canonical(direction or 'none')}"
 
 
-def encode_gesture(motion_type: str, direction: str, duration_ms: int) -> list[float]:
+def encode_gesture(
+    motion_type: str, direction: str, duration_ms: int,
+    speed: float | None = None, amplitude: float | None = None,
+) -> list[float]:
     motion = canonical(motion_type)
     direction_key = canonical(direction or "none")
     dx, dy = DIRECTION_VECTORS.get(direction_key, (0.0, 0.0))
     m1, m2, m3 = MOTION_CODES.get(motion, (0.33, 0.33, 0.33))
     duration = min(max(duration_ms / 1000.0, 0.0), 2.0) / 2.0
     vector = [dx, dy, m1, m2, m3, duration]
+    if (speed is None) != (amplitude is None):
+        raise ValueError("speed and amplitude must be provided together")
+    if speed is not None:
+        # Keep missing measurements in the legacy six-dimensional format.
+        # Paired angular features retain scalar differences after normalization;
+        # speed is ROI widths/s and amplitude is accumulated ROI widths.
+        def scalar_pair(value: float, scale: float) -> list[float]:
+            angle = min(max(value / scale, 0.0), 1.0) * math.pi / 2
+            return [math.cos(angle), math.sin(angle)]
+
+        vector = [dx, dy, m1, m2, m3]
+        vector += scalar_pair(duration_ms, 2000)
+        vector += scalar_pair(speed, 2)
+        vector += scalar_pair(amplitude, 1)
     norm = math.sqrt(sum(value * value for value in vector)) or 1.0
     return [round(value / norm, 6) for value in vector]
 

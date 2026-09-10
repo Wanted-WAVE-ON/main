@@ -31,6 +31,7 @@ from ..schemas import (
     TeachResponse,
 )
 from ..services.feedback_service import record_feedback
+from ..services.context_resolver import resolve_context
 from ..services.gesture_encoder import encode_gesture, gesture_key
 from ..services.intent_reasoner import infer_intent
 from ..services.pattern_learning import record_user_action, respond_to_suggestion
@@ -48,11 +49,15 @@ def _get_or_404(db: Session, model: type, key: str, label: str):
 @router.post("/observe", response_model=ObserveResponse)
 def observe(payload: ObserveRequest, db: Session = Depends(get_db)) -> dict:
     _get_or_404(db, User, payload.user_id, "User")
+    try:
+        activity, active_app = resolve_context(payload.context.activity, payload.context.active_app)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     context = Context(
         id=str(uuid4()),
         user_id=payload.user_id,
-        active_app=payload.context.active_app,
-        activity=payload.context.activity,
+        active_app=active_app,
+        activity=activity,
         space=payload.context.space,
         device=payload.context.device,
     )
@@ -66,6 +71,8 @@ def observe(payload: ObserveRequest, db: Session = Depends(get_db)) -> dict:
             payload.gesture.motion_type,
             payload.gesture.direction,
             payload.gesture.duration_ms,
+            payload.gesture.speed,
+            payload.gesture.amplitude,
         ),
         motion_type=payload.gesture.motion_type,
         direction=payload.gesture.direction,

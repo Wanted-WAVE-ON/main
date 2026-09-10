@@ -2,6 +2,8 @@
 
 ## 진행 중
 
+- [ ] 2026-09-10: 현재 HEAD `edafa51` 기준 구조적 문제 수정: 앱 맥락 자동화, 실제 후속 조작 관측, 실측 embedding/유사도, 최근 학습·승자 강등·거절 억제·감지 오류 분리, 발표 Q&A 정합성 및 회귀 검증. 사용자 기준 `6b62db4`는 로컬에서 찾을 수 없음.
+  - [x] 2026-09-10: 웹캠 클라이언트를 문서화된 계약에 맞췄다. `--input-mode observe|labels`, `--activity auto`, `--learn`, 실측 speed·amplitude 전송, 관측 모드의 5초·동일 맥락 첫 키 Teach 연결(`select_observed_teach`)을 구현하고 `input_observer`를 연결했다. `operations.md`의 존재하지 않는 플래그와 `fr-17-validation.md`의 옛 실행·수치를 갱신했다. pytest 78개 통과.
 - [ ] FR-17 웹캠: 감지 로직 구현 후 하드웨어 검증 중. 선택 경로 시연 시 발표 환경의 조명·배경·프레임률에서 좌우 swipe 품질을 확인하고 [Notion](https://ken-jeong.notion.site/wave-on) 상태를 갱신한다.
 
 ## 할 일

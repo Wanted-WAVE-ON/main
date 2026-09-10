@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, model_validator
 
 Activity = Literal["presentation", "music"]
 SuggestionDecision = Literal["ACCEPTED", "REJECTED", "MODIFIED"]
@@ -28,8 +28,8 @@ class UserRead(ORMModel):
 
 
 class ContextInput(APIModel):
-    active_app: str = Field(min_length=1, max_length=100)
-    activity: Activity
+    active_app: str | None = Field(default=None, min_length=1, max_length=100)
+    activity: Activity | None = None
     space: str = Field(default="unspecified", max_length=100)
     device: str = Field(default="laptop", max_length=100)
 
@@ -48,7 +48,17 @@ class GestureInput(APIModel):
     motion_type: str = Field(min_length=1, max_length=50)
     direction: str = Field(default="none", max_length=30)
     duration_ms: int = Field(default=430, ge=0, le=10_000)
-    embedding: list[float] | None = Field(default=None, min_length=4, max_length=64)
+    speed: FiniteFloat | None = Field(default=None, ge=0, le=10)
+    amplitude: FiniteFloat | None = Field(default=None, ge=0, le=10)
+    embedding: list[FiniteFloat] | None = Field(default=None, min_length=4, max_length=64)
+
+    @model_validator(mode="after")
+    def measured_features_are_paired(self):
+        if (self.speed is None) != (self.amplitude is None):
+            raise ValueError("speed and amplitude must be provided together")
+        if self.speed is not None and self.embedding is not None:
+            raise ValueError("Provide measured features or an embedding, not both")
+        return self
 
 
 class ObservationRead(ORMModel):
