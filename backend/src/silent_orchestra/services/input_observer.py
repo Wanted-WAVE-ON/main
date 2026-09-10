@@ -182,7 +182,9 @@ class WindowsInputObserver:
             self._ready.set()
 
     def start(self):
-        if platform.system() != "Windows":
+        # The Windows gate only guards the native hook; an injected adapter
+        # (tests, or a future platform) brings its own capture mechanism.
+        if isinstance(self.adapter, WindowsHookAdapter) and platform.system() != "Windows":
             raise OSError("Native input observation requires Windows; use --input-mode labels for simulation")
         self._thread = threading.Thread(target=self._run, name="application-control-observer", daemon=True)
         self._thread.start()
