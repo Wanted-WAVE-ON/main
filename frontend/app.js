@@ -67,6 +67,9 @@ let cameraPalmActive = false;
 let cameraCircleSamples = [];
 // Filled from /demo/bootstrap so the labels have one source of truth.
 let intentLabels = {};
+let autoExecutionThreshold = 0.6;
+let osActionsEnabled = false;
+let demoModeEnabled = true;
 
 const CAMERA_SAMPLE_WIDTH = 160;
 const CAMERA_SAMPLE_HEIGHT = 90;
@@ -685,6 +688,54 @@ function closeActionOverlay() {
   if (overlay.open) overlay.close();
 }
 
+const TUTORIAL_HIDE_KEY = "so_tutorial_hidden_until";
+const TUTORIAL_SLIDE_COUNT = all(".tutorial-slide").length;
+let tutorialSlideIndex = 0;
+
+function todayKey() {
+  return new Date().toLocaleDateString("en-CA");
+}
+
+function isTutorialHiddenToday() {
+  try {
+    return window.localStorage.getItem(TUTORIAL_HIDE_KEY) === todayKey();
+  } catch (_) {
+    return false;
+  }
+}
+
+function renderTutorialSlide() {
+  all(".tutorial-slide").forEach((slide, index) => {
+    slide.hidden = index !== tutorialSlideIndex;
+  });
+  const dots = byId("tutorialDots");
+  dots.innerHTML = Array.from({ length: TUTORIAL_SLIDE_COUNT }, (_, index) => (
+    `<button class="tutorial-dot${index === tutorialSlideIndex ? " active" : ""}" type="button" data-slide-index="${index}" aria-label="${index + 1}단계로 이동"></button>`
+  )).join("");
+  all("[data-slide-index]", dots).forEach((dot) => {
+    dot.addEventListener("click", () => {
+      tutorialSlideIndex = Number(dot.dataset.slideIndex);
+      renderTutorialSlide();
+    });
+  });
+  const isLast = tutorialSlideIndex === TUTORIAL_SLIDE_COUNT - 1;
+  byId("tutorialPrev").hidden = tutorialSlideIndex === 0;
+  byId("tutorialNext").textContent = isLast ? "시작하기" : "다음";
+}
+
+function openTutorial() {
+  tutorialSlideIndex = 0;
+  byId("tutorialHideToday").checked = false;
+  renderTutorialSlide();
+  const overlay = byId("tutorialOverlay");
+  if (!overlay.open) overlay.showModal();
+}
+
+function closeTutorial() {
+  const overlay = byId("tutorialOverlay");
+  if (overlay.open) overlay.close();
+}
+
 async function submitFeedback(type) {
   if (!lastExecution) return;
   await withBusy(all("[data-feedback]"), async () => {
@@ -744,14 +795,20 @@ function renderSuggestions(suggestions, candidates) {
   });
 }
 
-function renderMemories(memories) {
+// FR-13 (auto demotion) has no dedicated event log on the backend - a
+// CANDIDATE with observation_count already past the suggestion threshold can
+// only have gotten there by being ACTIVE first, so we infer "demoted" rather
+// than "still forming" from that alone. Best-effort, frontend-only signal.
+function inferDemotionReason(candidate) {
+  return candidate.negative_feedback_count > 0
+    ? "부정 피드백 누적으로 신뢰도가 낮아져 대기 상태로 전환된 것으로 추정"
+    : "다른 후속 행동과 판단이 엇갈려 대기 상태로 전환된 것으로 추정";
+}
+
+function renderMemories(memories, demoted = []) {
   const host = byId("memoryList");
   byId("memoryCount").textContent = memories.length;
-  if (!memories.length) {
-    host.innerHTML = `<div class="empty-state small"><p>아직 기억된 몸짓이 없습니다.</p></div>`;
-    return;
-  }
-  host.innerHTML = memories.map((memory) => {
+  const memoryHtml = memories.map((memory) => {
     const confidence = Math.round(memory.confidence * 100);
     const symbol = gestureSymbols[memory.gesture_key] || "?";
     return `<article class="memory-item">
@@ -763,6 +820,24 @@ function renderMemories(memories) {
       <div class="memory-confidence"><span>${confidence}%</span><div class="bar"><i style="width:${confidence}%"></i></div></div>
     </article>`;
   }).join("");
+  const demotedHtml = demoted.length ? `
+    <div class="memory-demoted-heading">자동 강등 추정 (${demoted.length})</div>
+    ${demoted.map((candidate) => {
+      const confidence = Math.round(candidate.confidence * 100);
+      const symbol = gestureSymbols[candidate.gesture_key] || "?";
+      return `<article class="memory-item demoted">
+        <div class="memory-top">
+          <span class="memory-symbol">${symbol}</span>
+          <div><strong>${intentLabel(candidate.intent)}</strong><small>${candidate.motion_type} / ${candidate.direction} / ${candidate.observation_count} observations</small></div>
+          <span class="context-chip">${candidate.context_scope}</span>
+        </div>
+        <div class="memory-confidence"><span>${confidence}%</span><div class="bar"><i style="width:${confidence}%"></i></div></div>
+        <p class="demoted-reason">${inferDemotionReason(candidate)}</p>
+      </article>`;
+    }).join("")}` : "";
+  host.innerHTML = memoryHtml || demotedHtml
+    ? memoryHtml + demotedHtml
+    : `<div class="empty-state small"><p>아직 기억된 몸짓이 없습니다.</p></div>`;
 }
 
 function renderInterpretations(memories) {
@@ -793,6 +868,41 @@ function renderEvents(events) {
   }).join("");
 }
 
+const feedbackLabels = {
+  CORRECT: "맞아요",
+  WRONG_ACTION: "아니에요",
+  ACCIDENTAL_GESTURE: "의도치 않은 몸짓",
+  IGNORE: "무시",
+};
+
+function renderExecutionAudit(entries = []) {
+  const host = byId("auditList");
+  if (!entries.length) {
+    host.innerHTML = `<div class="empty-mini">자동 실행된 기록이 아직 없습니다.</div>`;
+    return;
+  }
+  host.innerHTML = entries.map((entry) => {
+    const date = new Date(entry.executed_at);
+    const time = Number.isNaN(date.getTime()) ? "" : date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const symbol = gestureSymbols[entry.gesture_key] || "?";
+    const confidence = Math.round(entry.confidence * 100);
+    const reason = entry.status === "FAILED"
+      ? (entry.error_message || "동작을 전달하지 못했습니다.")
+      : `${entry.context_scope} · ${entry.motion_type}/${entry.direction} · ${entry.execution_mode}`;
+    const feedback = entry.feedback_type
+      ? `<span class="audit-feedback" data-feedback="${entry.feedback_type}">${feedbackLabels[entry.feedback_type] || entry.feedback_type}</span>`
+      : `<span>피드백 대기</span>`;
+    return `<article class="audit-item" data-status="${entry.status}">
+      <div class="audit-top">
+        <span class="audit-symbol">${symbol}</span>
+        <div><strong>${intentLabel(entry.intent)}</strong><small>${reason}</small></div>
+        <span class="audit-confidence">${confidence}%</span>
+      </div>
+      <div class="audit-meta"><span>${time}</span>${feedback}</div>
+    </article>`;
+  }).join("");
+}
+
 async function refreshDashboard() {
   if (dashboardRequest) return dashboardRequest;
   dashboardRequest = loadDashboard();
@@ -807,13 +917,27 @@ async function loadDashboard() {
   try {
   const state = await request(`/dashboard?user_id=${encodeURIComponent(USER_ID)}`);
   dashboardState = state;
+  // The in-browser camera stream is authoritative when it's running locally;
+  // otherwise fall back to detecting the separate Python webcam client from
+  // the space it stamps on observations.
+  const fromWebcam = Boolean(cameraStream) || state.context?.space === "camera_demo";
+  const modePill = byId("inputModePill");
+  modePill.textContent = fromWebcam ? "웹캠 실시간 감지" : "버튼 시뮬레이션";
+  modePill.dataset.source = fromWebcam ? "webcam" : "button";
   byId("metricObservations").textContent = state.counts.observations;
   byId("metricMemories").textContent = state.counts.learned_memories;
   byId("metricPending").textContent = state.counts.pending_suggestions;
   renderSuggestions(state.suggestions, state.candidates);
-  renderMemories(state.memories);
+  // Exclude candidates still awaiting their first suggestion decision - only
+  // ones that reached the threshold with no pending suggestion can only have
+  // gotten there via a prior ACTIVE/rejected state, i.e. an actual demotion.
+  const pendingPatternIds = new Set(state.suggestions.map((suggestion) => suggestion.gesture_pattern_id));
+  const demoted = state.candidates.filter((candidate) => candidate.observation_count >= state.threshold
+    && !pendingPatternIds.has(candidate.id));
+  renderMemories(state.memories, demoted);
   renderInterpretations(state.memories);
   renderEvents(state.events);
+  renderExecutionAudit(state.execution_audit);
   const candidate = state.candidates.find((item) => item.context_scope === currentContext);
   byId("learningProgress").textContent = candidate
     ? `${Math.min(candidate.observation_count, state.threshold)}/${state.threshold}`
@@ -865,15 +989,52 @@ async function resetDemo() {
   button.textContent = "초기화";
 }
 
+async function loadPrivacy() {
+  try {
+    const privacy = await request("/demo/privacy");
+    const items = byId("privacyChecklist").children;
+    const flags = [privacy.raw_video_stored, privacy.face_recognition_used, privacy.cloud_video_uploaded];
+    flags.forEach((on, index) => {
+      const label = items[index].firstChild;
+      const value = items[index].querySelector("strong");
+      label.textContent = label.textContent.trim();
+      value.textContent = on ? "ON" : "OFF";
+      value.dataset.on = String(on);
+    });
+    byId("privacyNote").textContent = `${privacy.processing_mode} — ${privacy.note}`;
+  } catch (_) {
+    // Keep the static OFF/OFF/OFF defaults baked into the markup.
+  }
+}
+
+function applyBootstrapConfig(bootstrap) {
+  intentLabels = bootstrap.intent_labels;
+  autoExecutionThreshold = bootstrap.auto_execution_threshold;
+  osActionsEnabled = bootstrap.os_actions_enabled;
+  demoModeEnabled = bootstrap.demo_mode;
+
+  const thresholdPct = Math.round(autoExecutionThreshold * 100);
+  byId("memoryPanelDescription").textContent = `승인된 연결만 자동 실행합니다 (신뢰도 ${thresholdPct}% 이상).`;
+
+  const osModeBadge = byId("osModeBadge");
+  osModeBadge.textContent = osActionsEnabled ? "실제 키 입력 활성" : "시뮬레이션 모드";
+  osModeBadge.dataset.live = String(osActionsEnabled);
+
+  const resetButton = byId("resetButton");
+  resetButton.disabled = !demoModeEnabled;
+  resetButton.title = demoModeEnabled ? "" : "데모 모드가 아니어서 초기화를 사용할 수 없습니다.";
+}
+
 async function init() {
   try {
-    intentLabels = (await post("/demo/bootstrap")).intent_labels;
+    applyBootstrapConfig(await post("/demo/bootstrap"));
     renderContext();
     await refreshDashboard();
   } catch (error) {
     showToast(`서버 연결 실패: ${error.message}`);
     byId("dashboardConnection").hidden = false;
   }
+  loadPrivacy();
 
   startAutoRefresh();
   byId("retryDashboard").addEventListener("click", () => refreshDashboard().catch(() => {}));
@@ -914,6 +1075,36 @@ async function init() {
   byId("actionOverlay").addEventListener("close", () => {
     lastGestureButton?.focus({ preventScroll: true });
   });
+
+  byId("tutorialButton").addEventListener("click", openTutorial);
+  byId("tutorialSkip").addEventListener("click", closeTutorial);
+  byId("tutorialPrev").addEventListener("click", () => {
+    tutorialSlideIndex = Math.max(0, tutorialSlideIndex - 1);
+    renderTutorialSlide();
+  });
+  byId("tutorialNext").addEventListener("click", () => {
+    if (tutorialSlideIndex === TUTORIAL_SLIDE_COUNT - 1) return closeTutorial();
+    tutorialSlideIndex += 1;
+    renderTutorialSlide();
+  });
+  byId("tutorialOverlay").addEventListener("click", (event) => {
+    if (event.target.id !== "tutorialOverlay") return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const isOutside = event.clientX < rect.left || event.clientX > rect.right
+      || event.clientY < rect.top || event.clientY > rect.bottom;
+    if (isOutside) closeTutorial();
+  });
+  // Runs on every close path (button, backdrop click, Esc) so the checkbox
+  // is honored even when the native dialog closes itself on Escape.
+  byId("tutorialOverlay").addEventListener("close", () => {
+    if (!byId("tutorialHideToday").checked) return;
+    try {
+      window.localStorage.setItem(TUTORIAL_HIDE_KEY, todayKey());
+    } catch (_) {
+      // Storage unavailable (e.g. private browsing) - just skip persisting.
+    }
+  });
+  if (!isTutorialHiddenToday()) openTutorial();
 }
 
 document.addEventListener("DOMContentLoaded", init);

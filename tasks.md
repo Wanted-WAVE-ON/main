@@ -14,6 +14,7 @@
 - [ ] 2026-09-10: 현재 HEAD `edafa51` 기준 구조적 문제 수정: 앱 맥락 자동화, 실제 후속 조작 관측, 실측 embedding/유사도, 최근 학습·승자 강등·거절 억제·감지 오류 분리, 발표 Q&A 정합성 및 회귀 검증. 사용자 기준 `6b62db4`는 로컬에서 찾을 수 없음.
   - [x] 2026-09-10: 웹캠 클라이언트를 문서화된 계약에 맞췄다. `--input-mode observe|labels`, `--activity auto`, `--learn`, 실측 speed·amplitude 전송, 관측 모드의 5초·동일 맥락 첫 키 Teach 연결(`select_observed_teach`)을 구현하고 `input_observer`를 연결했다. `operations.md`의 존재하지 않는 플래그와 `fr-17-validation.md`의 옛 실행·수치를 갱신했다. pytest 78개 통과.
 - [x] 2026-09-14: 구조 감사(A/B/C/D 목록) 재검증 후 잔여 3건 반영: (1) 파이썬 웹캠 클라이언트에 open_palm·circle 감지 추가(A-5) — 이미 계산 중이던 MOG2 전경 마스크로 손바닥 펼치기(정지 전경 지속)·원형 움직임(전경 중심점 누적 회전각)을 판별, `observation_payload`가 `motion_type`을 받도록 확장, pytest 7개 추가. (2) 원형 움직임에 반지름·회전속도를 speed·amplitude로 전송해 실측 개인차를 반영(A-3 잔여분, 브라우저·파이썬 양쪽). (3) 승자 선택 자체를 `_recency_weight` 가중합으로 변경(C-2 잔여분) — 이전엔 confidence에만 시간 가중이 곱해져 "누가 이기는지"는 raw count 그대로였음; `spec.md` L-3/L-5, `docs/decision-log.md` 갱신, 회귀 테스트로 라우 카운트 우세와 무관하게 최근 증거가 승자를 뒤집는 경우를 검증. `pytest backend/tests` 114개, `node --test frontend/tests/app.test.cjs` 7개 통과. A-1(라벨링 비용)·A-2(맥락 자동화)·A-4(유사도 가중)·C-1(강등)·C-3(거절 학습)·C-4(오작동 벌점)·D(winning_target)는 재확인 결과 이미 해결돼 있었다(각 `spec.md`·코드 근거는 대화 기록 참고). B-2(콜드스타트)·C-5(표현력 천장 전반)는 M-1 안전 원칙의 의도된 트레이드오프로 남겨둔다.
+- [x] 2026-09-15: `codex/frontend-workbench`(워크벤치 미니멀 리디자인 + 튜토리얼/개인정보 연동/실행 감사 로그/OS 배지)를 `main`(카메라 손짓 인식, 맥락 자동 정규화, 실측 speed·amplitude, 최근성 가중 승자 선택)과 병합. `frontend/index.html`이 두 브랜치에서 독립적으로 재작성되어 충돌했던 걸, 카메라 손짓 인식 패널을 워크벤치 디자인 톤에 맞춰 다시 붙이는 방식으로 해결. `app.js`/`schemas.py`/`agent.py`/`styles.css`는 자동 병합됨. 병합된 app.js가 참조하는 DOM id(`cameraVideo`·`startCameraButton`·`stopCameraButton`·`cameraDeviceSelect`·`cameraPreview`·`cameraStatus`·`cameraLive`·`cameraMode`)를 전수 대조해 누락 없음을 확인. 입력 모드 배지가 브라우저 카메라 스트림도 우선 감지하도록 보완.
 - [ ] FR-17 웹캠: 감지 로직 구현 후 하드웨어 검증 중. 선택 경로 시연 시 발표 환경의 조명·배경·프레임률에서 좌우 swipe 품질을 확인하고 [Notion](https://ken-jeong.notion.site/wave-on) 상태를 갱신한다.
 
 ## 할 일
@@ -22,6 +23,10 @@
 - [ ] OS 실행 시연 시에만 발표 PC에서 [운영 가이드](docs/operations.md)에 따라 설정·권한·대상 앱 매핑과 실행 결과를 확인한다.
 
 ## 검증 기록
+
+- [x] 사용자 피드백에 따라 구체·동심원·그라데이션·영문 장식 문구를 제거하고, 상태 표시를 축소했다. 입력 영역을 위로 올리고 2열 버튼·얇은 구분선으로 정리했다. Node 회귀 테스트 3개 통과 및 로컬 좁은 화면 렌더링 확인.
+
+- [x] Workbench 리디자인: 동심원 Agent 신호, 01·02 입력 단계, 맥락 레일·기억 목록과 한국어 지표를 적용했다. 기존 Node 회귀 테스트 3개 및 diff 검사 통과. 로컬 브라우저에서 데스크톱·390px 모바일 배치, 중복 ID 없음·가로 넘침 없음과 Presentation/Music 전환을 확인했다.
 
 - [x] 2026-09-08: 아키텍처의 낮은 추론 점수 분기, 실행당 피드백 최대 1건 ERD, 행동 동률 Q&A를 규칙·구현에 맞췄다. OS 실행 절차를 `docs/operations.md`로 통합하고 README·PLAN·TASKS·Q&A·결정 로그에서 참조한다. ERD의 중복 검증 명령·결과와 오래된 PLAN 참조를 제거했다. 로컬 문서 링크·제목 앵커 66개 검증 통과. 문서만 변경하여 앱 테스트는 재실행하지 않았다.
 

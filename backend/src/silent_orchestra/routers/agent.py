@@ -207,6 +207,33 @@ def dashboard(user_id: str, db: Session = Depends(get_db)) -> dict:
     actions = recent(Action, Action.executed_at, limit=8)
     executions = recent(Execution, Execution.executed_at, limit=8)
 
+    audit_rows = db.execute(
+        select(Execution, GesturePattern, Feedback)
+        .join(GesturePattern, Execution.gesture_pattern_id == GesturePattern.id)
+        .outerjoin(Feedback, Feedback.execution_id == Execution.id)
+        .where(Execution.user_id == user_id)
+        .order_by(desc(Execution.executed_at))
+        .limit(10)
+    ).all()
+    execution_audit = [
+        {
+            "id": execution.id,
+            "executed_at": execution.executed_at,
+            "gesture_key": pattern.gesture_key,
+            "motion_type": pattern.motion_type,
+            "direction": pattern.direction,
+            "context_scope": pattern.context_scope,
+            "intent": execution.intent,
+            "target": execution.target,
+            "confidence": execution.confidence,
+            "execution_mode": execution.execution_mode,
+            "status": execution.status,
+            "error_message": execution.error_message,
+            "feedback_type": feedback.feedback_type if feedback else None,
+        }
+        for execution, pattern, feedback in audit_rows
+    ]
+
     events = [
         {
             "time": item.detected_at,
@@ -248,5 +275,6 @@ def dashboard(user_id: str, db: Session = Depends(get_db)) -> dict:
         "candidates": candidates,
         "suggestions": suggestions,
         "events": events[:12],
+        "execution_audit": execution_audit,
         "threshold": settings.suggestion_threshold,
     }

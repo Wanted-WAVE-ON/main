@@ -212,6 +212,22 @@ class DashboardEvent(BaseModel):
     status: str | None = None
 
 
+class ExecutionAuditRead(BaseModel):
+    id: str
+    executed_at: datetime
+    gesture_key: str
+    motion_type: str
+    direction: str
+    context_scope: str
+    intent: str
+    target: str
+    confidence: float
+    execution_mode: str
+    status: str
+    error_message: str | None
+    feedback_type: str | None
+
+
 class DashboardResponse(BaseModel):
     context: ContextRead | None
     counts: dict[str, int]
@@ -219,6 +235,7 @@ class DashboardResponse(BaseModel):
     candidates: list[PatternRead]
     suggestions: list[SuggestionRead]
     events: list[DashboardEvent]
+    execution_audit: list[ExecutionAuditRead]
     threshold: int
 
 
