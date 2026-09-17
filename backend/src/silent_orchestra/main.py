@@ -16,7 +16,8 @@ STATIC_DIR = PROJECT_ROOT / "frontend"
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    (PROJECT_ROOT / "data").mkdir(parents=True, exist_ok=True)
+    if settings.database_url.startswith("sqlite"):
+        (PROJECT_ROOT / "data").mkdir(parents=True, exist_ok=True)
     init_db()
     with SessionLocal() as db:
         ensure_demo_user(db)

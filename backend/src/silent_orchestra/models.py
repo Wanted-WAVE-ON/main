@@ -64,7 +64,7 @@ class GestureObservation(Base):
     __tablename__ = "gesture_observations"
     __table_args__ = (
         CheckConstraint("duration_ms >= 0", name="ck_observation_duration"),
-        CheckConstraint("frame_stored = 0", name="ck_raw_frame_never_stored"),
+        CheckConstraint("frame_stored = false", name="ck_raw_frame_never_stored"),
         CheckConstraint("(speed IS NULL) = (amplitude IS NULL)", name="ck_observation_features_paired"),
         Index("ix_observations_user_gesture", "user_id", "gesture_key"),
         Index("ix_observations_detected_at", "detected_at"),
